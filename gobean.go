@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/99designs/gobean/cli"
@@ -14,7 +13,6 @@ import (
 
 func main() {
 	opts := cli.ParseFlags()
-	name, args := parseCommand(opts.Cmd)
 
 	c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
 	if err != nil {
@@ -29,17 +27,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		handleJob(id, body, name, args)
+		handleJob(id, body, opts.Cmd.Name, opts.Cmd.Args)
 		ts.Conn.Delete(id)
 	}
-}
-
-// TODO: integrate into options.go
-func parseCommand(line string) (name string, args []string) {
-	s := strings.Fields(line)
-	name = s[0]
-	args = s[1:]
-	return
 }
 
 func handleJob(id uint64, body []byte, name string, args []string) {
