@@ -29,7 +29,8 @@ import (
 func main() {
 	opts := cli.ParseFlags()
 
-	c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
+	log.Println("Connecting to", opts.Address)
+	c, err := beanstalk.Dial("tcp", opts.Address)
 	if err != nil {
 		panic(err)
 	}

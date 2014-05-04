@@ -12,11 +12,14 @@ import (
 // parsing command line flags.
 type Options struct {
 
-	// The beanstalkd tubes to watch.
-	Tubes TubeList
+	// The beanstalkd TCP address.
+	Address string
 
 	// The command to execute for each job.
 	Cmd CommandWithArgs
+
+	// The beanstalkd tubes to watch.
+	Tubes TubeList
 }
 
 // CommandWithArgs represents a process command and its arguments, in a
@@ -34,6 +37,7 @@ type TubeList []string
 func ParseFlags() (o Options) {
 	o.Tubes = TubeList{"default"}
 
+	flag.StringVar(&o.Address, "address", "127.0.0.1:11300", "beanstalkd TCP address.")
 	flag.Var(&o.Cmd, "cmd", "Command to run in worker.")
 	flag.Var(&o.Tubes, "tubes", "Comma separated list of tubes.")
 	flag.Parse()
@@ -43,9 +47,15 @@ func ParseFlags() (o Options) {
 	return
 }
 
+// TODO: return an error instead of os.Exit(1)
 func validateOptions(o Options) {
 	log.Printf("%#v", o)
 	if o.Cmd.Name == "" {
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	if o.Address == "" {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
