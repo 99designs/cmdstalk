@@ -27,7 +27,7 @@ import (
 )
 
 func main() {
-	opts := cli.ParseFlags()
+	opts := cli.MustParseFlags()
 
 	log.Println("Connecting to", opts.Address)
 	c, err := beanstalk.Dial("tcp", opts.Address)

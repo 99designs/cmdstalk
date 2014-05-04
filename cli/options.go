@@ -32,9 +32,20 @@ type CommandWithArgs struct {
 // TubeList is a list of beanstalkd tube names.
 type TubeList []string
 
+// Calls ParseFlags(), os.Exit(1) on error.
+func MustParseFlags() (o Options) {
+	o, err := ParseFlags()
+	if err != nil {
+		flag.PrintDefaults()
+		fmt.Println()
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	return
+}
+
 // ParseFlags parses and validates CLI flags into an Options struct.
-// It may exit(1) if CLI validation fails.
-func ParseFlags() (o Options) {
+func ParseFlags() (o Options, err error) {
 	o.Tubes = TubeList{"default"}
 
 	flag.StringVar(&o.Address, "address", "127.0.0.1:11300", "beanstalkd TCP address.")
@@ -42,12 +53,7 @@ func ParseFlags() (o Options) {
 	flag.Var(&o.Tubes, "tubes", "Comma separated list of tubes.")
 	flag.Parse()
 
-	if err := validateOptions(o); err != nil {
-		flag.PrintDefaults()
-		fmt.Println()
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	err = validateOptions(o)
 
 	return
 }
