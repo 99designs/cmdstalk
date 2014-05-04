@@ -1,3 +1,6 @@
+/*
+	Package cli provides command line support for gobean.
+*/
 package cli
 
 import (
