@@ -78,8 +78,12 @@ func (t *TubeList) String() string {
 // Set replaces the CommandWithArgs by parsing the value string.
 func (c *CommandWithArgs) Set(value string) error {
 	parts := strings.Fields(value)
-	c.Name = parts[0]
-	c.Args = parts[1:]
+	if len(parts) >= 1 {
+		c.Name = parts[0]
+	}
+	if len(parts) >= 2 {
+		c.Args = parts[1:]
+	}
 	return nil
 }
 
