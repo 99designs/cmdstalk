@@ -1,9 +1,9 @@
 package cli
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 )
@@ -42,22 +42,31 @@ func ParseFlags() (o Options) {
 	flag.Var(&o.Tubes, "tubes", "Comma separated list of tubes.")
 	flag.Parse()
 
-	validateOptions(o)
+	if err := validateOptions(o); err != nil {
+		flag.PrintDefaults()
+		fmt.Println()
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	return
 }
 
-// TODO: return an error instead of os.Exit(1)
-func validateOptions(o Options) {
-	log.Printf("%#v", o)
+func validateOptions(o Options) error {
+	msgs := make([]string, 0)
+
 	if o.Cmd.Name == "" {
-		flag.PrintDefaults()
-		os.Exit(1)
+		msgs = append(msgs, "Command must not be empty.")
 	}
 
 	if o.Address == "" {
-		flag.PrintDefaults()
-		os.Exit(1)
+		msgs = append(msgs, "Address must not be empty.")
+	}
+
+	if len(msgs) == 0 {
+		return nil
+	} else {
+		return errors.New(strings.Join(msgs, "\n"))
 	}
 }
 
