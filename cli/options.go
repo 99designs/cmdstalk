@@ -8,18 +8,29 @@ import (
 	"strings"
 )
 
+// Options contains runtime configuration, and is generally the result of
+// parsing command line flags.
 type Options struct {
+
+	// The beanstalkd tubes to watch.
 	Tubes TubeList
-	Cmd   CommandWithArgs
+
+	// The command to execute for each job.
+	Cmd CommandWithArgs
 }
 
+// CommandWithArgs represents a process command and its arguments, in a
+// exec.Command() friendly format.
 type CommandWithArgs struct {
 	Name string
 	Args []string
 }
 
+// TubeList is a list of beanstalkd tube names.
 type TubeList []string
 
+// ParseFlags parses and validates CLI flags into an Options struct.
+// It may exit(1) if CLI validation fails.
 func ParseFlags() (o Options) {
 	o.Tubes = TubeList{"default"}
 
@@ -40,6 +51,7 @@ func validateOptions(o Options) {
 	}
 }
 
+// Set replaces the TubeList by parsing the comma-separated value string.
 func (t *TubeList) Set(value string) error {
 	list := strings.Split(value, ",")
 	for i, value := range list {
@@ -53,6 +65,7 @@ func (t *TubeList) String() string {
 	return fmt.Sprint(*t)
 }
 
+// Set replaces the CommandWithArgs by parsing the value string.
 func (c *CommandWithArgs) Set(value string) error {
 	parts := strings.Fields(value)
 	c.Name = parts[0]
