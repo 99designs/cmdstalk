@@ -59,13 +59,13 @@ func New(address, tube string, cmd string, results chan<- *JobResult) (b Broker)
 // If ticks channel is present, one job is processed per tick.
 func (b *Broker) Run(ticks chan bool) {
 	b.log.Println("connecting to", b.Address)
-	c, err := beanstalk.Dial("tcp", b.Address)
+	conn, err := beanstalk.Dial("tcp", b.Address)
 	if err != nil {
 		panic(err)
 	}
 
 	b.log.Println("watching", b.Tube)
-	ts := beanstalk.NewTubeSet(c, b.Tube)
+	ts := beanstalk.NewTubeSet(conn, b.Tube)
 
 	for {
 		if ticks != nil {
@@ -77,40 +77,44 @@ func (b *Broker) Run(ticks chan bool) {
 			b.log.Println("tickless")
 		}
 
-		id, body, err := ts.Reserve(24 * time.Hour)
-		if err != nil {
-			b.log.Fatal(err)
-		}
-
-		job := job{id: id, body: body, conn: c}
-
-		result, err := b.handleJob(job, b.Cmd)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		b.log.Printf("job %d finished with exit(%d)", id, result.ExitStatus)
-		if result.ExitStatus == 0 {
-			ts.Conn.Delete(id)
-		} else if result.ExitStatus == 1 {
-			pri, err := job.priority()
-			if err != nil {
-				b.log.Fatal(err)
-			}
-			releaseErr := ts.Conn.Release(id, pri, 0)
-			if releaseErr != nil {
-				b.log.Fatal(releaseErr)
-			}
-		} else {
-			log.Fatal(result.ExitStatus)
-		}
-
-		if b.results != nil {
-			b.results <- result
-		}
+		b.doTick(conn, ts)
 	}
 
 	b.log.Println("broker finished")
+}
+
+func (b *Broker) doTick(conn *beanstalk.Conn, ts *beanstalk.TubeSet) {
+	id, body, err := ts.Reserve(24 * time.Hour)
+	if err != nil {
+		b.log.Fatal(err)
+	}
+
+	job := job{id: id, body: body, conn: conn}
+
+	result, err := b.handleJob(job, b.Cmd)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	b.log.Printf("job %d finished with exit(%d)", id, result.ExitStatus)
+	if result.ExitStatus == 0 {
+		ts.Conn.Delete(id)
+	} else if result.ExitStatus == 1 {
+		pri, err := job.priority()
+		if err != nil {
+			b.log.Fatal(err)
+		}
+		releaseErr := ts.Conn.Release(id, pri, 0)
+		if releaseErr != nil {
+			b.log.Fatal(releaseErr)
+		}
+	} else {
+		log.Fatal(result.ExitStatus)
+	}
+
+	if b.results != nil {
+		b.results <- result
+	}
 }
 
 func (b *Broker) handleJob(job job, shellCmd string) (*JobResult, error) {
