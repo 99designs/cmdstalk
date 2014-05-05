@@ -18,18 +18,11 @@ type Options struct {
 	// The beanstalkd TCP address.
 	Address string
 
-	// The command to execute for each job.
-	Cmd CommandWithArgs
+	// The shell command to execute for each job.
+	Cmd string
 
 	// The beanstalkd tubes to watch.
 	Tubes TubeList
-}
-
-// CommandWithArgs represents a process command and its arguments, in a
-// exec.Command() friendly format.
-type CommandWithArgs struct {
-	Name string
-	Args []string
 }
 
 // TubeList is a list of beanstalkd tube names.
@@ -52,7 +45,7 @@ func ParseFlags() (o Options, err error) {
 	o.Tubes = TubeList{"default"}
 
 	flag.StringVar(&o.Address, "address", "127.0.0.1:11300", "beanstalkd TCP address.")
-	flag.Var(&o.Cmd, "cmd", "Command to run in worker.")
+	flag.StringVar(&o.Cmd, "cmd", "", "Command to run in worker.")
 	flag.Var(&o.Tubes, "tubes", "Comma separated list of tubes.")
 	flag.Parse()
 
@@ -64,7 +57,7 @@ func ParseFlags() (o Options, err error) {
 func validateOptions(o Options) error {
 	msgs := make([]string, 0)
 
-	if o.Cmd.Name == "" {
+	if o.Cmd == "" {
 		msgs = append(msgs, "Command must not be empty.")
 	}
 
@@ -91,26 +84,4 @@ func (t *TubeList) Set(value string) error {
 
 func (t *TubeList) String() string {
 	return fmt.Sprint(*t)
-}
-
-// Set replaces the CommandWithArgs by parsing the value string.
-func (c *CommandWithArgs) Set(value string) error {
-	parts := strings.Fields(value)
-	if len(parts) >= 1 {
-		c.Name = parts[0]
-	}
-	if len(parts) >= 2 {
-		c.Args = parts[1:]
-	}
-	return nil
-}
-
-func (c *CommandWithArgs) String() string {
-	if len(c.Name) == 0 {
-		return "\"\""
-	} else if len(c.Args) == 0 {
-		return c.Name
-	} else {
-		return fmt.Sprintf("%s %s", c.Name, strings.Join(c.Args, " "))
-	}
 }

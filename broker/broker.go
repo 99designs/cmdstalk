@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/99designs/cmdstalk/cli"
 	"github.com/kr/beanstalk"
 )
 
@@ -21,8 +20,8 @@ type Broker struct {
 	// Address of the beanstalkd server.
 	Address string
 
-	// The command to execute for each job.
-	Cmd cli.CommandWithArgs
+	// The shell command to execute for each job.
+	Cmd string
 
 	// Tube name this broker will service.
 	Tube string
@@ -31,7 +30,7 @@ type Broker struct {
 }
 
 // New broker instance.
-func New(address, tube string, cmd cli.CommandWithArgs) (b Broker) {
+func New(address, tube string, cmd string) (b Broker) {
 	b.Address = address
 	b.Tube = tube
 	b.Cmd = cmd
@@ -56,13 +55,14 @@ func (b *Broker) Run() {
 		if err != nil {
 			b.log.Fatal(err)
 		}
-		b.handleJob(id, body, b.Cmd.Name, b.Cmd.Args)
+		b.handleJob(id, body, b.Cmd)
 		ts.Conn.Delete(id)
 	}
 }
 
-func (b *Broker) handleJob(id uint64, body []byte, name string, args []string) {
-	cmd := exec.Command(name, args...)
+func (b *Broker) handleJob(id uint64, body []byte, shellCmd string) {
+
+	cmd := exec.Command("/bin/bash", "-c", shellCmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
