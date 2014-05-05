@@ -11,7 +11,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/99designs/gobean/cli"
+	"github.com/99designs/cmdstalk/cli"
 	"github.com/kr/beanstalk"
 )
 

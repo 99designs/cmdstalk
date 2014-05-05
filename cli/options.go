@@ -1,5 +1,5 @@
 /*
-	Package cli provides command line support for gobean.
+	Package cli provides command line support for cmdstalk.
 */
 package cli
 
