@@ -35,3 +35,7 @@ func (j job) release() error {
 	}
 	return nil
 }
+
+func (j job) delete() error {
+	return j.conn.Delete(j.id)
+}

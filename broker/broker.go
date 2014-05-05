@@ -5,9 +5,9 @@
 package broker
 
 import (
-	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -42,6 +42,9 @@ type JobResult struct {
 
 	// Stdout of the command.
 	Stdout string
+
+	// Error raised while attempting to handle the job.
+	Error error
 }
 
 // New broker instance.
@@ -83,83 +86,93 @@ func (b *Broker) Run(ticks chan bool) {
 	b.log.Println("broker finished")
 }
 
-func (b *Broker) doTick(conn *beanstalk.Conn, ts *beanstalk.TubeSet) error {
+func (b *Broker) doTick(conn *beanstalk.Conn, ts *beanstalk.TubeSet) (err error) {
 	id, body, err := ts.Reserve(24 * time.Hour)
 	if err != nil {
-		return err
+		return
 	}
 
 	job := job{id: id, body: body, conn: conn}
 
+	b.log.Printf("handling job %d", job.id)
 	result, err := b.handleJob(job, b.Cmd)
 	if err != nil {
-		return err
+		return
+	}
+	if result.Error != nil {
+		b.log.Println("result had error")
 	}
 
 	b.log.Printf("job %d finished with exit(%d)", id, result.ExitStatus)
-	if result.ExitStatus == 0 {
-		ts.Conn.Delete(id)
-	} else if result.ExitStatus == 1 {
-		job.release()
-	} else {
-		return fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
+	switch result.ExitStatus {
+	case 0:
+		err = job.delete()
+	case 1:
+		err = job.release()
+	default:
+		err = fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
 	}
 
 	if b.results != nil {
 		b.results <- result
 	}
 
-	return nil
+	return
 }
 
-func (b *Broker) handleJob(job job, shellCmd string) (*JobResult, error) {
+func (b *Broker) handleJob(job job, shellCmd string) (result *JobResult, err error) {
+	result = &JobResult{JobId: job.id}
 
-	result := &JobResult{JobId: job.id}
-
-	cmd := exec.Command("/bin/bash", "-c", shellCmd)
-
-	stdin, err := cmd.StdinPipe()
+	cmd, stdout, err := startCommand(shellCmd, job.body)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	stdout, err := cmd.StdoutPipe()
+	log.Println("reading stdout")
+	bytes, err := ioutil.ReadAll(stdout)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	err = cmd.Start()
-	if err != nil {
-		return nil, err
-	}
+	result.Stdout = string(bytes)
 
-	// write into stdin
-	written, err := stdin.Write(job.body)
-	if err == nil {
-		b.log.Println(written, "bytes written")
-	} else {
-		return nil, err
-	}
-	stdin.Close()
-
-	// read from stdout
-	stdoutBuffer := new(bytes.Buffer)
-	read, err := io.Copy(stdoutBuffer, stdout)
-	if err == nil {
-		b.log.Println(read, "bytes read")
-	} else {
-		return nil, err
-	}
-
+	log.Println("waiting on cmd")
 	err = cmd.Wait()
 
 	if e1, ok := err.(*exec.ExitError); ok {
 		result.ExitStatus = e1.Sys().(syscall.WaitStatus).ExitStatus()
-	} else {
-		result.ExitStatus = 0
+		err = nil // not a handleJob error
 	}
 
-	result.Stdout = stdoutBuffer.String()
+	return
+}
 
-	return result, nil
+func startCommand(shellCmd string, input []byte) (cmd *exec.Cmd, stdout io.ReadCloser, err error) {
+	cmd = exec.Command("/bin/bash", "-c", shellCmd)
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return
+	}
+
+	stdout, err = cmd.StdoutPipe()
+	if err != nil {
+		return
+	}
+
+	log.Println("starting cmd")
+	err = cmd.Start()
+	if err != nil {
+		return
+	}
+
+	log.Println("writing to stdin")
+	_, err = stdin.Write(input)
+	if err != nil {
+		return
+	}
+	log.Println("closing stdin")
+	stdin.Close()
+
+	return
 }
