@@ -5,6 +5,7 @@
 package broker
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -27,11 +28,23 @@ type Broker struct {
 	Tube string
 
 	log     *log.Logger
-	results chan<- bool
+	results chan<- *JobResult
+}
+
+type JobResult struct {
+
+	// ExitStatus of the command; 0 for success.
+	ExitStatus int
+
+	// JobId from beanstalkd.
+	JobId uint64
+
+	// Stdout of the command.
+	Stdout string
 }
 
 // New broker instance.
-func New(address, tube string, cmd string, results chan<- bool) (b Broker) {
+func New(address, tube string, cmd string, results chan<- *JobResult) (b Broker) {
 	b.Address = address
 	b.Tube = tube
 	b.Cmd = cmd
@@ -57,31 +70,34 @@ func (b *Broker) Run() {
 		if err != nil {
 			b.log.Fatal(err)
 		}
-		b.handleJob(id, body, b.Cmd)
+		result, err := b.handleJob(id, body, b.Cmd)
+		if err != nil {
+			log.Fatal(err)
+		}
 		ts.Conn.Delete(id)
 		if b.results != nil {
-			b.results <- true
+			b.results <- result
 		}
 	}
 }
 
-func (b *Broker) handleJob(id uint64, body []byte, shellCmd string) {
+func (b *Broker) handleJob(id uint64, body []byte, shellCmd string) (*JobResult, error) {
 
 	cmd := exec.Command("/bin/bash", "-c", shellCmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		b.log.Fatal(err)
+		return nil, err
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		b.log.Fatal(err)
+		return nil, err
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		b.log.Fatal(err)
+		return nil, err
 	}
 
 	// write into stdin
@@ -89,20 +105,27 @@ func (b *Broker) handleJob(id uint64, body []byte, shellCmd string) {
 	if err == nil {
 		b.log.Println(written, "bytes written")
 	} else {
-		b.log.Fatal(err)
+		return nil, err
 	}
 	stdin.Close()
 
 	// read from stdout
-	read, err := io.Copy(os.Stdout, stdout)
+	stdoutBuffer := new(bytes.Buffer)
+	read, err := io.Copy(stdoutBuffer, stdout)
 	if err == nil {
 		b.log.Println(read, "bytes read")
 	} else {
-		b.log.Fatal(err)
+		return nil, err
 	}
 
 	err = cmd.Wait()
 	if err != nil {
-		b.log.Fatal(err)
+		return nil, err
 	}
+
+	return &JobResult{
+		ExitStatus: 0,
+		JobId:      id,
+		Stdout:     stdoutBuffer.String(),
+	}, nil
 }
