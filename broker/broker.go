@@ -77,50 +77,38 @@ func (b *Broker) Run(ticks chan bool) {
 			}
 		}
 
-		err = b.doTick(conn, ts)
+		id, body, err := ts.Reserve(24 * time.Hour)
 		if err != nil {
 			log.Panic(err)
+		}
+
+		job := &job{id: id, body: body, conn: conn}
+
+		b.log.Printf("executing job %d", job.id)
+		result, err := b.executeJob(job, b.Cmd)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		b.log.Printf("handling result for job %d", job.id)
+		b.handleResult(job, result)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		if result.Error != nil {
+			b.log.Println("result had error:", result.Error)
+		}
+
+		if b.results != nil {
+			b.results <- result
 		}
 	}
 
 	b.log.Println("broker finished")
 }
 
-func (b *Broker) doTick(conn *beanstalk.Conn, ts *beanstalk.TubeSet) (err error) {
-	id, body, err := ts.Reserve(24 * time.Hour)
-	if err != nil {
-		return
-	}
-
-	job := job{id: id, body: body, conn: conn}
-
-	b.log.Printf("handling job %d", job.id)
-	result, err := b.handleJob(job, b.Cmd)
-	if err != nil {
-		return
-	}
-	if result.Error != nil {
-		b.log.Println("result had error")
-	}
-
-	b.log.Printf("job %d finished with exit(%d)", id, result.ExitStatus)
-	switch result.ExitStatus {
-	case 0:
-		err = job.delete()
-	case 1:
-		err = job.release()
-	default:
-		err = fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
-	}
-
-	if b.results != nil {
-		b.results <- result
-	}
-
-	return
-}
-
-func (b *Broker) handleJob(job job, shellCmd string) (result *JobResult, err error) {
+func (b *Broker) executeJob(job *job, shellCmd string) (result *JobResult, err error) {
 	result = &JobResult{JobId: job.id}
 
 	cmd, stdout, err := startCommand(shellCmd, job.body)
@@ -141,9 +129,22 @@ func (b *Broker) handleJob(job job, shellCmd string) (result *JobResult, err err
 
 	if e1, ok := err.(*exec.ExitError); ok {
 		result.ExitStatus = e1.Sys().(syscall.WaitStatus).ExitStatus()
-		err = nil // not a handleJob error
+		err = nil // not a executeJob error
 	}
 
+	return
+}
+
+func (b *Broker) handleResult(job *job, result *JobResult) (err error) {
+	b.log.Printf("job %d finished with exit(%d)", job.id, result.ExitStatus)
+	switch result.ExitStatus {
+	case 0:
+		err = job.delete()
+	case 1:
+		err = job.release()
+	default:
+		err = fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
+	}
 	return
 }
 
