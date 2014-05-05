@@ -25,11 +25,12 @@ func main() {
 
 	for _, tube := range opts.Tubes {
 		go func(tube string) {
-			b := broker.New(opts.Address, tube, opts.Cmd)
+			b := broker.New(opts.Address, tube, opts.Cmd, nil)
 			b.Run()
 		}(tube)
 	}
 
+	// TODO: wire up to SIGTERM handler etc.
 	exitChan := make(chan bool)
 	<-exitChan
 }

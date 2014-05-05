@@ -26,16 +26,18 @@ type Broker struct {
 	// Tube name this broker will service.
 	Tube string
 
-	log *log.Logger
+	log     *log.Logger
+	results chan<- bool
 }
 
 // New broker instance.
-func New(address, tube string, cmd string) (b Broker) {
+func New(address, tube string, cmd string, results chan<- bool) (b Broker) {
 	b.Address = address
 	b.Tube = tube
 	b.Cmd = cmd
 
 	b.log = log.New(os.Stdout, fmt.Sprintf("[%s] ", tube), log.LstdFlags)
+	b.results = results
 	return
 }
 
@@ -57,6 +59,9 @@ func (b *Broker) Run() {
 		}
 		b.handleJob(id, body, b.Cmd)
 		ts.Conn.Delete(id)
+		if b.results != nil {
+			b.results <- true
+		}
 	}
 }
 
