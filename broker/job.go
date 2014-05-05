@@ -23,3 +23,15 @@ func (j job) priority() (uint32, error) {
 
 	return uint32(pri64), nil
 }
+
+func (j job) release() error {
+	pri, err := j.priority()
+	if err != nil {
+		return err
+	}
+	err = j.conn.Release(j.id, pri, 0)
+	if err != nil {
+		return err
+	}
+	return nil
+}

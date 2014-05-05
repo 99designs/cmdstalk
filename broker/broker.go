@@ -100,14 +100,7 @@ func (b *Broker) doTick(conn *beanstalk.Conn, ts *beanstalk.TubeSet) error {
 	if result.ExitStatus == 0 {
 		ts.Conn.Delete(id)
 	} else if result.ExitStatus == 1 {
-		pri, err := job.priority()
-		if err != nil {
-			return err
-		}
-		err = ts.Conn.Release(id, pri, 0)
-		if err != nil {
-			return err
-		}
+		job.release()
 	} else {
 		return fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
 	}
