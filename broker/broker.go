@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/kr/beanstalk"
@@ -55,7 +56,8 @@ func New(address, tube string, cmd string, results chan<- *JobResult) (b Broker)
 }
 
 // Run connects to beanstalkd and starts broking.
-func (b *Broker) Run() {
+// If ticks channel is present, one job is processed per tick.
+func (b *Broker) Run(ticks chan bool) {
 	b.log.Println("connecting to", b.Address)
 	c, err := beanstalk.Dial("tcp", b.Address)
 	if err != nil {
@@ -66,6 +68,15 @@ func (b *Broker) Run() {
 	ts := beanstalk.NewTubeSet(c, b.Tube)
 
 	for {
+		if ticks != nil {
+			b.log.Println("waiting for tick")
+			if _, ok := <-ticks; !ok {
+				break
+			}
+		} else {
+			b.log.Println("tickless")
+		}
+
 		id, body, err := ts.Reserve(24 * time.Hour)
 		if err != nil {
 			b.log.Fatal(err)
@@ -74,14 +85,30 @@ func (b *Broker) Run() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		ts.Conn.Delete(id)
+
+		b.log.Printf("job %d finished with exit(%d)", id, result.ExitStatus)
+		if result.ExitStatus == 0 {
+			ts.Conn.Delete(id)
+		} else if result.ExitStatus == 1 {
+			releaseErr := ts.Conn.Release(id, 123, 0)
+			if releaseErr != nil {
+				b.log.Fatal(releaseErr)
+			}
+		} else {
+			log.Fatal(result.ExitStatus)
+		}
+
 		if b.results != nil {
 			b.results <- result
 		}
 	}
+
+	b.log.Println("broker finished")
 }
 
 func (b *Broker) handleJob(id uint64, body []byte, shellCmd string) (*JobResult, error) {
+
+	result := &JobResult{JobId: id}
 
 	cmd := exec.Command("/bin/bash", "-c", shellCmd)
 
@@ -119,13 +146,14 @@ func (b *Broker) handleJob(id uint64, body []byte, shellCmd string) (*JobResult,
 	}
 
 	err = cmd.Wait()
-	if err != nil {
-		return nil, err
+
+	if e1, ok := err.(*exec.ExitError); ok {
+		result.ExitStatus = e1.Sys().(syscall.WaitStatus).ExitStatus()
+	} else {
+		result.ExitStatus = 0
 	}
 
-	return &JobResult{
-		ExitStatus: 0,
-		JobId:      id,
-		Stdout:     stdoutBuffer.String(),
-	}, nil
+	result.Stdout = stdoutBuffer.String()
+
+	return result, nil
 }
