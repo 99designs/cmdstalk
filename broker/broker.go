@@ -69,31 +69,31 @@ func (b *Broker) Run(ticks chan bool) {
 
 	for {
 		if ticks != nil {
-			b.log.Println("waiting for tick")
 			if _, ok := <-ticks; !ok {
 				break
 			}
-		} else {
-			b.log.Println("tickless")
 		}
 
-		b.doTick(conn, ts)
+		err = b.doTick(conn, ts)
+		if err != nil {
+			log.Panic(err)
+		}
 	}
 
 	b.log.Println("broker finished")
 }
 
-func (b *Broker) doTick(conn *beanstalk.Conn, ts *beanstalk.TubeSet) {
+func (b *Broker) doTick(conn *beanstalk.Conn, ts *beanstalk.TubeSet) error {
 	id, body, err := ts.Reserve(24 * time.Hour)
 	if err != nil {
-		b.log.Fatal(err)
+		return err
 	}
 
 	job := job{id: id, body: body, conn: conn}
 
 	result, err := b.handleJob(job, b.Cmd)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	b.log.Printf("job %d finished with exit(%d)", id, result.ExitStatus)
@@ -102,19 +102,21 @@ func (b *Broker) doTick(conn *beanstalk.Conn, ts *beanstalk.TubeSet) {
 	} else if result.ExitStatus == 1 {
 		pri, err := job.priority()
 		if err != nil {
-			b.log.Fatal(err)
+			return err
 		}
-		releaseErr := ts.Conn.Release(id, pri, 0)
-		if releaseErr != nil {
-			b.log.Fatal(releaseErr)
+		err = ts.Conn.Release(id, pri, 0)
+		if err != nil {
+			return err
 		}
 	} else {
-		log.Fatal(result.ExitStatus)
+		return fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
 	}
 
 	if b.results != nil {
 		b.results <- result
 	}
+
+	return nil
 }
 
 func (b *Broker) handleJob(job job, shellCmd string) (*JobResult, error) {
