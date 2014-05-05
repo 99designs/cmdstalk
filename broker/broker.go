@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -30,6 +31,24 @@ type Broker struct {
 
 	log     *log.Logger
 	results chan<- *JobResult
+}
+
+type job struct {
+	conn *beanstalk.Conn
+	body []byte
+	id   uint64
+}
+
+func (j job) priority() (uint32, error) {
+
+	stats, err := j.conn.StatsJob(j.id)
+	if err != nil {
+		return 0, err
+	}
+
+	pri64, err := strconv.ParseUint(stats["pri"], 10, 32)
+
+	return uint32(pri64), nil
 }
 
 type JobResult struct {
@@ -81,7 +100,10 @@ func (b *Broker) Run(ticks chan bool) {
 		if err != nil {
 			b.log.Fatal(err)
 		}
-		result, err := b.handleJob(id, body, b.Cmd)
+
+		job := job{id: id, body: body, conn: c}
+
+		result, err := b.handleJob(job, b.Cmd)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -90,7 +112,11 @@ func (b *Broker) Run(ticks chan bool) {
 		if result.ExitStatus == 0 {
 			ts.Conn.Delete(id)
 		} else if result.ExitStatus == 1 {
-			releaseErr := ts.Conn.Release(id, 123, 0)
+			pri, err := job.priority()
+			if err != nil {
+				b.log.Fatal(err)
+			}
+			releaseErr := ts.Conn.Release(id, pri, 0)
 			if releaseErr != nil {
 				b.log.Fatal(releaseErr)
 			}
@@ -106,9 +132,9 @@ func (b *Broker) Run(ticks chan bool) {
 	b.log.Println("broker finished")
 }
 
-func (b *Broker) handleJob(id uint64, body []byte, shellCmd string) (*JobResult, error) {
+func (b *Broker) handleJob(job job, shellCmd string) (*JobResult, error) {
 
-	result := &JobResult{JobId: id}
+	result := &JobResult{JobId: job.id}
 
 	cmd := exec.Command("/bin/bash", "-c", shellCmd)
 
@@ -128,7 +154,7 @@ func (b *Broker) handleJob(id uint64, body []byte, shellCmd string) (*JobResult,
 	}
 
 	// write into stdin
-	written, err := stdin.Write(body)
+	written, err := stdin.Write(job.body)
 	if err == nil {
 		b.log.Println(written, "bytes written")
 	} else {

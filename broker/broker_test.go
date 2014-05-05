@@ -15,7 +15,7 @@ const (
 )
 
 func TestWorkerSuccess(t *testing.T) {
-	tube, id := queueJob("hello world")
+	tube, id := queueJob("hello world", 10)
 
 	cmd := "tr [a-z] [A-Z]"
 	results := make(chan *JobResult)
@@ -43,7 +43,7 @@ func TestWorkerSuccess(t *testing.T) {
 
 func TestWorkerFailure(t *testing.T) {
 	log.Println("TestWorkerFailure")
-	tube, id := queueJob("hello world")
+	tube, id := queueJob("hello world", 10)
 
 	cmd := "false"
 	results := make(chan *JobResult)
@@ -66,9 +66,10 @@ func TestWorkerFailure(t *testing.T) {
 
 	assertJobStat(t, id, "state", "ready")
 	assertJobStat(t, id, "releases", "1")
+	assertJobStat(t, id, "pri", "10")
 }
 
-func queueJob(body string) (string, uint64) {
+func queueJob(body string, priority uint32) (string, uint64) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	tubeName := "cmdstalk-test-" + strconv.FormatInt(r.Int63(), 16)
 	assertTubeEmpty(tubeName)
@@ -80,7 +81,7 @@ func queueJob(body string) (string, uint64) {
 
 	tube := beanstalk.Tube{Conn: c, Name: tubeName}
 
-	id, err := tube.Put([]byte(body), 1, 0, 120*time.Second)
+	id, err := tube.Put([]byte(body), priority, 0, 120*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
