@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/99designs/cmdstalk/bs"
 	"github.com/kr/beanstalk"
 )
 
@@ -119,22 +120,22 @@ func (b *Broker) Run(ticks chan bool) {
 
 		b.log.Println("reserve (waiting for job)")
 		id, body := b.mustReserveWithoutTimeout(ts)
-		job := &job{id: id, body: body, conn: conn}
+		job := bs.NewJob(id, body, conn)
 
-		t, err := job.timeouts()
+		t, err := job.Timeouts()
 		if err != nil {
 			log.Panic(err)
 		}
 		if t > 0 {
-			b.log.Printf("job %d has %d timeouts, burying", job.id, t)
-			job.bury()
+			b.log.Printf("job %d has %d timeouts, burying", job.Id, t)
+			job.Bury()
 			if b.results != nil {
-				b.results <- &JobResult{JobId: job.id, Buried: true}
+				b.results <- &JobResult{JobId: job.Id, Buried: true}
 			}
 			continue
 		}
 
-		b.log.Printf("executing job %d", job.id)
+		b.log.Printf("executing job %d", job.Id)
 		result, err := b.executeJob(job, b.Cmd)
 		if err != nil {
 			log.Panic(err)
@@ -157,16 +158,16 @@ func (b *Broker) Run(ticks chan bool) {
 	b.log.Println("broker finished")
 }
 
-func (b *Broker) executeJob(job *job, shellCmd string) (result *JobResult, err error) {
-	result = &JobResult{JobId: job.id, Executed: true}
+func (b *Broker) executeJob(job bs.Job, shellCmd string) (result *JobResult, err error) {
+	result = &JobResult{JobId: job.Id, Executed: true}
 
-	ttr, err := job.timeLeft()
+	ttr, err := job.TimeLeft()
 	timer := time.NewTimer(ttr + ttrMargin)
 	if err != nil {
 		return
 	}
 
-	cmd, stdout, err := startCommand(shellCmd, job.body)
+	cmd, stdout, err := startCommand(shellCmd, job.Body)
 	if err != nil {
 		return
 	}
@@ -238,19 +239,19 @@ func (b *Broker) killWorker(p *os.Process) {
 	// TODO: follow up with SIGKILL if still running.
 }
 
-func (b *Broker) handleResult(job *job, result *JobResult) (err error) {
+func (b *Broker) handleResult(job bs.Job, result *JobResult) (err error) {
 	if result.TimedOut {
-		b.log.Printf("job %d timed out", job.id)
+		b.log.Printf("job %d timed out", job.Id)
 		return
 	}
-	b.log.Printf("job %d finished with exit(%d)", job.id, result.ExitStatus)
+	b.log.Printf("job %d finished with exit(%d)", job.Id, result.ExitStatus)
 	switch result.ExitStatus {
 	case 0:
-		b.log.Printf("deleting job %d", job.id)
-		err = job.delete()
+		b.log.Printf("deleting job %d", job.Id)
+		err = job.Delete()
 	case 1:
-		b.log.Printf("releasing job %d", job.id)
-		err = job.release()
+		b.log.Printf("releasing job %d", job.Id)
+		err = job.Release()
 	default:
 		err = fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
 	}
