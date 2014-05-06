@@ -2,6 +2,7 @@ package broker
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/kr/beanstalk"
 )
@@ -12,16 +13,17 @@ type job struct {
 	id   uint64
 }
 
-func (j job) priority() (uint32, error) {
-
-	stats, err := j.conn.StatsJob(j.id)
+func (j job) bury() error {
+	pri, err := j.priority()
 	if err != nil {
-		return 0, err
+		return err
 	}
+	return j.conn.Bury(j.id, pri)
+}
 
-	pri64, err := strconv.ParseUint(stats["pri"], 10, 32)
-
-	return uint32(pri64), nil
+func (j job) priority() (uint32, error) {
+	pri64, err := j.uint64Stat("pri")
+	return uint32(pri64), err
 }
 
 func (j job) release() error {
@@ -29,13 +31,29 @@ func (j job) release() error {
 	if err != nil {
 		return err
 	}
-	err = j.conn.Release(j.id, pri, 0)
+	return j.conn.Release(j.id, pri, 0)
+}
+
+func (j job) timeLeft() (time.Duration, error) {
+	stats, err := j.conn.StatsJob(j.id)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	return time.ParseDuration(stats["time-left"] + "s")
+}
+
+func (j job) timeouts() (uint64, error) {
+	return j.uint64Stat("timeouts")
 }
 
 func (j job) delete() error {
 	return j.conn.Delete(j.id)
+}
+
+func (j job) uint64Stat(key string) (uint64, error) {
+	stats, err := j.conn.StatsJob(j.id)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseUint(stats[key], 10, 64)
 }

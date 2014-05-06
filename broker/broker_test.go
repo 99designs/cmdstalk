@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"bytes"
 	"log"
 	"math/rand"
 	"strconv"
@@ -16,6 +17,7 @@ const (
 
 func TestWorkerSuccess(t *testing.T) {
 	tube, id := queueJob("hello world", 10)
+	expectStdout := []byte("HELLO WORLD")
 
 	cmd := "tr [a-z] [A-Z]"
 	results := make(chan *JobResult)
@@ -31,8 +33,8 @@ func TestWorkerSuccess(t *testing.T) {
 	if result.JobId != id {
 		t.Fatalf("result.JobId %d != queueJob id %d", result.JobId, id)
 	}
-	if result.Stdout != "HELLO WORLD" {
-		t.Fatal("Stdout does not match")
+	if bytes.Equal(result.Stdout, expectStdout) {
+		t.Fatalf("Stdout mismatch: '%s' != '%s'\n", result.Stdout, expectStdout)
 	}
 	if result.ExitStatus != 0 {
 		t.Fatalf("Unexpected exit status %d", result.ExitStatus)
@@ -81,7 +83,7 @@ func queueJob(body string, priority uint32) (string, uint64) {
 
 	tube := beanstalk.Tube{Conn: c, Name: tubeName}
 
-	id, err := tube.Put([]byte(body), priority, 0, 120*time.Second)
+	id, err := tube.Put([]byte(body), priority, 0, 2*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
