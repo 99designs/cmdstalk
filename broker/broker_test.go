@@ -12,11 +12,13 @@ import (
 )
 
 const (
-	address = "127.0.0.1:11300"
+	address    = "127.0.0.1:11300"
+	defaultTtr = 10 * time.Second
 )
 
+// TestWorkerSuccess demonstrates a successful exit(0) task (delete).
 func TestWorkerSuccess(t *testing.T) {
-	tube, id := queueJob("hello world", 10)
+	tube, id := queueJob("hello world", 10, defaultTtr)
 	expectStdout := []byte("HELLO WORLD")
 
 	cmd := "tr [a-z] [A-Z]"
@@ -24,9 +26,9 @@ func TestWorkerSuccess(t *testing.T) {
 	b := New(address, tube, cmd, results)
 
 	ticks := make(chan bool)
+	defer close(ticks)
 	go b.Run(ticks)
 	ticks <- true // handle a single job
-	close(ticks)
 
 	result := <-results
 
@@ -43,18 +45,18 @@ func TestWorkerSuccess(t *testing.T) {
 	assertTubeEmpty(tube)
 }
 
+// TestWorkerFailure demonstrates a failed exit(1) task (release).
 func TestWorkerFailure(t *testing.T) {
-	log.Println("TestWorkerFailure")
-	tube, id := queueJob("hello world", 10)
+	tube, id := queueJob("hello world", 10, defaultTtr)
 
 	cmd := "false"
 	results := make(chan *JobResult)
 	b := New(address, tube, cmd, results)
 
 	ticks := make(chan bool)
+	defer close(ticks)
 	go b.Run(ticks)
 	ticks <- true // handle a single job
-	close(ticks)
 
 	result := <-results
 
@@ -71,7 +73,33 @@ func TestWorkerFailure(t *testing.T) {
 	assertJobStat(t, id, "pri", "10")
 }
 
-func queueJob(body string, priority uint32) (string, uint64) {
+func TestWorkerTimeout(t *testing.T) {
+	ttr := 1 * time.Second
+	tube, id := queueJob("TestWorkerTimeout", 10, ttr)
+
+	cmd := "sleep 4"
+	results := make(chan *JobResult)
+	b := New(address, tube, cmd, results)
+
+	ticks := make(chan bool)
+	defer close(ticks)
+	go b.Run(ticks)
+
+	start := time.Now()
+	ticks <- true // handle a single job
+	result := <-results
+	duration := time.Since(start)
+
+	if duration < 1*time.Second {
+		t.Fatalf("%v too short to have timed out correctly", duration)
+	}
+
+	if result.TimedOut != true {
+		t.Fatalf("Expected job %d JobResult.TimedOut to be true", id)
+	}
+}
+
+func queueJob(body string, priority uint32, ttr time.Duration) (string, uint64) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	tubeName := "cmdstalk-test-" + strconv.FormatInt(r.Int63(), 16)
 	assertTubeEmpty(tubeName)
@@ -83,7 +111,7 @@ func queueJob(body string, priority uint32) (string, uint64) {
 
 	tube := beanstalk.Tube{Conn: c, Name: tubeName}
 
-	id, err := tube.Put([]byte(body), priority, 0, 2*time.Second)
+	id, err := tube.Put([]byte(body), priority, 0, ttr)
 	if err != nil {
 		log.Fatal(err)
 	}

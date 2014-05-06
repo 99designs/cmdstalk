@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	ttrMargin = 5 * time.Second
+	ttrMargin = 2 * time.Second
 )
 
 type Broker struct {
@@ -131,6 +131,8 @@ func (b *Broker) executeJob(job *job, shellCmd string) (result *JobResult, err e
 	result = &JobResult{JobId: job.id}
 
 	ttr, err := job.timeLeft()
+	// Add margin to compensate for beanstalkd's integer precision.
+	// e.g. reserving a TTR=1 job will show time-left=0.
 	timer := time.NewTimer(ttr + ttrMargin)
 	if err != nil {
 		return

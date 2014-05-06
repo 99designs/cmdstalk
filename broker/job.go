@@ -34,6 +34,7 @@ func (j job) release() error {
 	return j.conn.Release(j.id, pri, 0)
 }
 
+// time-left as reported by beanstalkd; floor(seconds)
 func (j job) timeLeft() (time.Duration, error) {
 	stats, err := j.conn.StatsJob(j.id)
 	if err != nil {
