@@ -20,10 +20,6 @@ const (
 	// e.g. reserving a TTR=1 job will show time-left=0.
 	// We need to set our SIGTERM timer to time-left + ttrMargin.
 	ttrMargin = 1 * time.Second
-
-	// deadlineSoonDelay defines a period to sleep between receiving
-	// DEADLINE_SOON in response to reserve, and re-attempting the reserve.
-	deadlineSoonDelay = 1 * time.Second
 )
 
 type Broker struct {
@@ -77,25 +73,6 @@ func New(address, tube string, cmd string, results chan<- *JobResult) (b Broker)
 	return
 }
 
-// reserve-with-timeout until there's a job or something panic-worthy.
-func (b *Broker) mustReserveWithoutTimeout(ts *beanstalk.TubeSet) (id uint64, body []byte) {
-	var err error
-	for {
-		id, body, err = ts.Reserve(1 * time.Hour)
-		if err == nil {
-			return
-		} else if err.(beanstalk.ConnError).Err == beanstalk.ErrTimeout {
-			continue
-		} else if err.(beanstalk.ConnError).Err == beanstalk.ErrDeadline {
-			b.log.Printf("%v (retrying in %v)", err, deadlineSoonDelay)
-			time.Sleep(deadlineSoonDelay)
-			continue
-		} else {
-			panic(err)
-		}
-	}
-}
-
 // Run connects to beanstalkd and starts broking.
 // If ticks channel is present, one job is processed per tick.
 func (b *Broker) Run(ticks chan bool) {
@@ -117,7 +94,7 @@ func (b *Broker) Run(ticks chan bool) {
 		}
 
 		b.log.Println("reserve (waiting for job)")
-		id, body := b.mustReserveWithoutTimeout(ts)
+		id, body := bs.MustReserveWithoutTimeout(ts)
 		job := bs.NewJob(id, body, conn)
 
 		t, err := job.Timeouts()

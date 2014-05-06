@@ -1,6 +1,3 @@
-/*
-	Package bs provides an active-record style interface over beanstalkd.
-*/
 package bs
 
 import (
