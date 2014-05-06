@@ -94,9 +94,20 @@ func TestWorkerTimeout(t *testing.T) {
 		t.Fatalf("%v too short to have timed out correctly", duration)
 	}
 
-	if result.TimedOut != true {
+	if !result.TimedOut {
 		t.Fatalf("Expected job %d JobResult.TimedOut to be true", id)
 	}
+
+	assertJobStat(t, id, "state", "ready")
+	assertJobStat(t, id, "timeouts", "1")
+
+	ticks <- true // handle another job
+	result = <-results
+	if !result.Buried {
+		t.Fatalf("Expected job %d JobResult.Buried", id)
+	}
+	assertJobStat(t, id, "state", "buried")
+	assertJobStat(t, id, "timeouts", "1")
 }
 
 func queueJob(body string, priority uint32, ttr time.Duration) (string, uint64) {

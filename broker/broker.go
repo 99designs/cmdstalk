@@ -37,6 +37,12 @@ type Broker struct {
 
 type JobResult struct {
 
+	// Buried is true if the job was buried.
+	Buried bool
+
+	// Executed is true if the job command was executed (or attempted).
+	Executed bool
+
 	// ExitStatus of the command; 0 for success.
 	ExitStatus int
 
@@ -100,6 +106,9 @@ func (b *Broker) Run(ticks chan bool) {
 		if t > 0 {
 			b.log.Printf("job %d has %d timeouts, burying", job.id, t)
 			job.bury()
+			if b.results != nil {
+				b.results <- &JobResult{JobId: job.id, Buried: true}
+			}
 			continue
 		}
 
@@ -128,7 +137,7 @@ func (b *Broker) Run(ticks chan bool) {
 }
 
 func (b *Broker) executeJob(job *job, shellCmd string) (result *JobResult, err error) {
-	result = &JobResult{JobId: job.id}
+	result = &JobResult{JobId: job.id, Executed: true}
 
 	ttr, err := job.timeLeft()
 	// Add margin to compensate for beanstalkd's integer precision.
