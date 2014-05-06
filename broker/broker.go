@@ -6,14 +6,12 @@ package broker
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"os/exec"
-	"syscall"
 	"time"
 
 	"github.com/99designs/cmdstalk/bs"
+	"github.com/99designs/cmdstalk/cmd"
 	"github.com/kr/beanstalk"
 )
 
@@ -167,21 +165,25 @@ func (b *Broker) executeJob(job bs.Job, shellCmd string) (result *JobResult, err
 		return
 	}
 
-	cmd, stdout, err := startCommand(shellCmd, job.Body)
+	cmd, out, err := cmd.NewCommand(shellCmd)
 	if err != nil {
 		return
 	}
 
-	stdoutC := readerToChannel(stdout)
+	if err = cmd.StartWithStdin(job.Body); err != nil {
+		return
+	}
 
 	// TODO: end loop when stdout closes
 stdoutReader:
 	for {
 		select {
 		case <-timer.C:
-			b.killWorker(cmd.Process)
+			if err = cmd.Terminate(); err != nil {
+				return
+			}
 			result.TimedOut = true
-		case data, ok := <-stdoutC:
+		case data, ok := <-out:
 			if !ok {
 				break stdoutReader
 			}
@@ -190,53 +192,25 @@ stdoutReader:
 		}
 	}
 
-	waitC := waitChan(cmd)
+	waitC := cmd.WaitChan()
 
 waitLoop:
 	for {
 		select {
 		case wr := <-waitC:
 			timer.Stop()
-			if wr.err == nil {
-				err = wr.err
+			if wr.Err == nil {
+				err = wr.Err
 			}
-			result.ExitStatus = wr.status
+			result.ExitStatus = wr.Status
 			break waitLoop
 		case <-timer.C:
-			b.killWorker(cmd.Process)
+			cmd.Terminate()
 			result.TimedOut = true
 		}
 	}
 
 	return
-}
-
-type waitResult struct {
-	status int
-	err    error
-}
-
-// Given a command, waits and sends the exit status over the returned channel.
-func waitChan(cmd *exec.Cmd) <-chan waitResult {
-	c := make(chan waitResult)
-	go func() {
-		err := cmd.Wait()
-		if err == nil {
-			c <- waitResult{0, nil}
-		} else if e1, ok := err.(*exec.ExitError); ok {
-			status := e1.Sys().(syscall.WaitStatus).ExitStatus()
-			c <- waitResult{status, nil}
-		} else {
-			c <- waitResult{-1, err}
-		}
-	}()
-	return c
-}
-
-func (b *Broker) killWorker(p *os.Process) {
-	b.log.Printf("Sending SIGTERM to worker PID %d", p.Pid)
-	p.Signal(syscall.SIGTERM)
-	// TODO: follow up with SIGKILL if still running.
 }
 
 func (b *Broker) handleResult(job bs.Job, result *JobResult) (err error) {
@@ -256,53 +230,4 @@ func (b *Broker) handleResult(job bs.Job, result *JobResult) (err error) {
 		err = fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
 	}
 	return
-}
-
-func startCommand(shellCmd string, input []byte) (cmd *exec.Cmd, stdout io.ReadCloser, err error) {
-	cmd = exec.Command("/bin/bash", "-c", shellCmd)
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return
-	}
-
-	stdout, err = cmd.StdoutPipe()
-	if err != nil {
-		return
-	}
-
-	cmd.Stderr = os.Stderr
-
-	err = cmd.Start()
-	if err != nil {
-		return
-	}
-
-	_, err = stdin.Write(input)
-	if err != nil {
-		return
-	}
-	stdin.Close()
-
-	return
-}
-
-func readerToChannel(reader io.Reader) <-chan []byte {
-	c := make(chan []byte)
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			n, err := reader.Read(buf)
-			if n > 0 {
-				res := make([]byte, n)
-				copy(res, buf[:n])
-				c <- res
-			}
-			if err != nil {
-				close(c)
-				break
-			}
-		}
-	}()
-	return c
 }
