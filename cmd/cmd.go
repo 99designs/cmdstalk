@@ -76,7 +76,9 @@ func (c *Cmd) Terminate() (err error) {
 	return c.cmd.Process.Signal(syscall.SIGTERM)
 }
 
-// Given a command, waits and sends the exit status over the returned channel.
+// WaitChan starts a goroutine to wait for the command to exit, and returns
+// a channel over which will be sent the WaitResult, containing either the
+// exit status (0 for success) or a non-exit error, e.g. IO error.
 func (cmd *Cmd) WaitChan() <-chan WaitResult {
 	ch := make(chan WaitResult)
 	go func() {
