@@ -189,21 +189,17 @@ stdoutReader:
 		}
 	}
 
-	waitC := make(chan error)
-	go func() {
-		waitC <- cmd.Wait()
-	}()
+	waitC := waitChan(cmd)
 
 waitLoop:
 	for {
 		select {
-		case err = <-waitC:
+		case wr := <-waitC:
 			timer.Stop()
-			if e1, ok := err.(*exec.ExitError); ok {
-				result.ExitStatus = e1.Sys().(syscall.WaitStatus).ExitStatus()
-				b.log.Printf("set exit status to %d", result.ExitStatus)
-				err = nil // not a executeJob error
+			if wr.err == nil {
+				err = wr.err
 			}
+			result.ExitStatus = wr.status
 			break waitLoop
 		case <-timer.C:
 			b.killWorker(cmd.Process)
@@ -212,6 +208,28 @@ waitLoop:
 	}
 
 	return
+}
+
+type waitResult struct {
+	status int
+	err    error
+}
+
+// Given a command, waits and sends the exit status over the returned channel.
+func waitChan(cmd *exec.Cmd) <-chan waitResult {
+	c := make(chan waitResult)
+	go func() {
+		err := cmd.Wait()
+		if err == nil {
+			c <- waitResult{0, nil}
+		} else if e1, ok := err.(*exec.ExitError); ok {
+			status := e1.Sys().(syscall.WaitStatus).ExitStatus()
+			c <- waitResult{status, nil}
+		} else {
+			c <- waitResult{-1, err}
+		}
+	}()
+	return c
 }
 
 func (b *Broker) killWorker(p *os.Process) {
