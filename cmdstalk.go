@@ -1,12 +1,11 @@
 // cmdstalk is a beanstalkd queue broker. It connects to beanstalkd, watches
 // tubes, reserves jobs, and spawns subcommands to process the work.
 //
-// cmdstalk monitors the stdout and exit status of the worker process, and
-// manages the beanstalkd job accordingly.
+// cmdstalk monitors the exit status of the worker process, and manages the
+// beanstalkd job accordingly.
 //
-// Output from the worker process causes cmdstalk to touch the beanstalkd job,
-// refreshing the TTR. If TTR is reached with no output, cmdstalk will send
-// SIGTERM then SIGKILL to the worker, and allow the job to time out.
+// If a job TTR is reached, cmdstalk will send SIGTERM then SIGKILL to the
+// worker, and allow the job to time out.
 //
 // Worker exit(0) tells cmdstalk to delete the job.
 // Worker exit(1) tells cmdstalk to release the job for reprocessing.
