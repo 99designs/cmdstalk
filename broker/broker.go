@@ -17,7 +17,14 @@ import (
 )
 
 const (
-	ttrMargin = 2 * time.Second
+	// ttrMargin compensates for beanstalkd's integer precision.
+	// e.g. reserving a TTR=1 job will show time-left=0.
+	// We need to set our SIGTERM timer to time-left + ttrMargin.
+	ttrMargin = 1 * time.Second
+
+	// deadlineSoonDelay defines a period to sleep between receiving
+	// DEADLINE_SOON in response to reserve, and re-attempting the reserve.
+	deadlineSoonDelay = 1 * time.Second
 )
 
 type Broker struct {
@@ -71,6 +78,25 @@ func New(address, tube string, cmd string, results chan<- *JobResult) (b Broker)
 	return
 }
 
+// reserve-with-timeout until there's a job or something panic-worthy.
+func (b *Broker) mustReserveWithoutTimeout(ts *beanstalk.TubeSet) (id uint64, body []byte) {
+	var err error
+	for {
+		id, body, err = ts.Reserve(1 * time.Hour)
+		if err == nil {
+			return
+		} else if err.(beanstalk.ConnError).Err == beanstalk.ErrTimeout {
+			continue
+		} else if err.(beanstalk.ConnError).Err == beanstalk.ErrDeadline {
+			b.log.Printf("%v (retrying in %v)", err, deadlineSoonDelay)
+			time.Sleep(deadlineSoonDelay)
+			continue
+		} else {
+			panic(err)
+		}
+	}
+}
+
 // Run connects to beanstalkd and starts broking.
 // If ticks channel is present, one job is processed per tick.
 func (b *Broker) Run(ticks chan bool) {
@@ -92,11 +118,7 @@ func (b *Broker) Run(ticks chan bool) {
 		}
 
 		b.log.Println("reserve (waiting for job)")
-		id, body, err := ts.Reserve(24 * time.Hour)
-		if err != nil {
-			log.Panic(err)
-		}
-
+		id, body := b.mustReserveWithoutTimeout(ts)
 		job := &job{id: id, body: body, conn: conn}
 
 		t, err := job.timeouts()
@@ -118,7 +140,6 @@ func (b *Broker) Run(ticks chan bool) {
 			log.Panic(err)
 		}
 
-		b.log.Printf("handling result for job %d", job.id)
 		err = b.handleResult(job, result)
 		if err != nil {
 			log.Panic(err)
@@ -140,8 +161,6 @@ func (b *Broker) executeJob(job *job, shellCmd string) (result *JobResult, err e
 	result = &JobResult{JobId: job.id, Executed: true}
 
 	ttr, err := job.timeLeft()
-	// Add margin to compensate for beanstalkd's integer precision.
-	// e.g. reserving a TTR=1 job will show time-left=0.
 	timer := time.NewTimer(ttr + ttrMargin)
 	if err != nil {
 		return
@@ -163,7 +182,6 @@ func (b *Broker) executeJob(job *job, shellCmd string) (result *JobResult, err e
 	for {
 		select {
 		case err = <-waitC:
-			b.log.Println("command has finished:", err)
 			timer.Stop()
 			if e1, ok := err.(*exec.ExitError); ok {
 				result.ExitStatus = e1.Sys().(syscall.WaitStatus).ExitStatus()
@@ -176,7 +194,7 @@ func (b *Broker) executeJob(job *job, shellCmd string) (result *JobResult, err e
 			result.TimedOut = true
 			// TODO: follow up with SIGKILL if still running.
 		case data := <-stdoutC:
-			b.log.Println("data from stdout")
+			b.log.Printf("stdout:\n%s", data)
 			result.Stdout = append(result.Stdout, data...)
 		}
 	}
