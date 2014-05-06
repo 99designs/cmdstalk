@@ -232,6 +232,8 @@ func startCommand(shellCmd string, input []byte) (cmd *exec.Cmd, stdout io.ReadC
 		return
 	}
 
+	cmd.Stderr = os.Stderr
+
 	err = cmd.Start()
 	if err != nil {
 		return
