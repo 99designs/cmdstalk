@@ -35,7 +35,7 @@ func TestWorkerSuccess(t *testing.T) {
 	if result.JobId != id {
 		t.Fatalf("result.JobId %d != queueJob id %d", result.JobId, id)
 	}
-	if bytes.Equal(result.Stdout, expectStdout) {
+	if !bytes.Equal(result.Stdout, expectStdout) {
 		t.Fatalf("Stdout mismatch: '%s' != '%s'\n", result.Stdout, expectStdout)
 	}
 	if result.ExitStatus != 0 {

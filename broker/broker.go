@@ -171,33 +171,53 @@ func (b *Broker) executeJob(job *job, shellCmd string) (result *JobResult, err e
 		return
 	}
 
+	stdoutC := readerToChannel(stdout)
+
+	// TODO: end loop when stdout closes
+stdoutReader:
+	for {
+		select {
+		case <-timer.C:
+			b.killWorker(cmd.Process)
+			result.TimedOut = true
+		case data, ok := <-stdoutC:
+			if !ok {
+				break stdoutReader
+			}
+			b.log.Printf("stdout: %s", data)
+			result.Stdout = append(result.Stdout, data...)
+		}
+	}
+
 	waitC := make(chan error)
 	go func() {
 		waitC <- cmd.Wait()
 	}()
 
-	stdoutC := make(chan []byte)
-	go readToChannel(stdout, stdoutC)
-
+waitLoop:
 	for {
 		select {
 		case err = <-waitC:
 			timer.Stop()
 			if e1, ok := err.(*exec.ExitError); ok {
 				result.ExitStatus = e1.Sys().(syscall.WaitStatus).ExitStatus()
+				b.log.Printf("set exit status to %d", result.ExitStatus)
 				err = nil // not a executeJob error
 			}
-			return
+			break waitLoop
 		case <-timer.C:
-			b.log.Printf("Sending SIGTERM to worker PID %d", cmd.Process.Pid)
-			cmd.Process.Signal(syscall.SIGTERM)
+			b.killWorker(cmd.Process)
 			result.TimedOut = true
-			// TODO: follow up with SIGKILL if still running.
-		case data := <-stdoutC:
-			b.log.Printf("stdout:\n%s", data)
-			result.Stdout = append(result.Stdout, data...)
 		}
 	}
+
+	return
+}
+
+func (b *Broker) killWorker(p *os.Process) {
+	b.log.Printf("Sending SIGTERM to worker PID %d", p.Pid)
+	p.Signal(syscall.SIGTERM)
+	// TODO: follow up with SIGKILL if still running.
 }
 
 func (b *Broker) handleResult(job *job, result *JobResult) (err error) {
@@ -248,13 +268,22 @@ func startCommand(shellCmd string, input []byte) (cmd *exec.Cmd, stdout io.ReadC
 	return
 }
 
-func readToChannel(reader io.Reader, c chan []byte) {
-	buf := make([]byte, 1024)
-	for {
-		_, err := reader.Read(buf)
-		if err != nil {
-			break
+func readerToChannel(reader io.Reader) <-chan []byte {
+	c := make(chan []byte)
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := reader.Read(buf)
+			if n > 0 {
+				res := make([]byte, n)
+				copy(res, buf[:n])
+				c <- res
+			}
+			if err != nil {
+				close(c)
+				break
+			}
 		}
-	}
-	c <- buf
+	}()
+	return c
 }
