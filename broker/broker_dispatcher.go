@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"log"
 	"time"
 
 	"github.com/kr/beanstalk"
@@ -60,10 +61,10 @@ func (bd *BrokerDispatcher) RunAllTubes() (err error) {
 	}
 
 	go func() {
-		ticker := time.Tick(ListTubeDelay)
+		ticker := instantTicker(ListTubeDelay)
 		for _ = range ticker {
 			if e := bd.watchNewTubes(); e != nil {
-				// ignore error
+				log.Println(e)
 			}
 		}
 	}()
@@ -91,4 +92,17 @@ func (bd *BrokerDispatcher) watchNewTubes() (err error) {
 	}
 
 	return
+}
+
+// Like time.Tick() but also fires immediately.
+func instantTicker(t time.Duration) <-chan time.Time {
+	c := make(chan time.Time)
+	ticker := time.NewTicker(t)
+	go func() {
+		c <- time.Now()
+		for t := range ticker.C {
+			c <- t
+		}
+	}()
+	return c
 }
