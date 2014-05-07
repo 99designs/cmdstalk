@@ -12,6 +12,10 @@ const (
 	ListTubeDelay = 10 * time.Second
 )
 
+// BrokerDispatcher manages the running of Broker instances for tubes.  It can
+// be manually told tubes to start, or it can poll for tubes as they are
+// created. The `perTube` option determines how many brokers are started for
+// each tube.
 type BrokerDispatcher struct {
 	address string
 	cmd     string
@@ -30,6 +34,8 @@ func NewBrokerDispatcher(address, cmd string, perTube uint64) *BrokerDispatcher 
 }
 
 // RunTube runs broker(s) for the specified tube.
+// The number of brokers started is determined by the perTube argument to
+// NewBrokerDispatcher.
 func (bd *BrokerDispatcher) RunTube(tube string) {
 	bd.tubeSet[tube] = true
 	for i := uint64(0); i < bd.perTube; i++ {
@@ -37,14 +43,14 @@ func (bd *BrokerDispatcher) RunTube(tube string) {
 	}
 }
 
-// RunTube runs a broker for the specified tubes.
+// RunTube runs brokers for the specified tubes.
 func (bd *BrokerDispatcher) RunTubes(tubes []string) {
 	for _, tube := range tubes {
 		bd.RunTube(tube)
 	}
 }
 
-// RunAllTubes polls beanstalkd, running a broker as new tubes are created.
+// RunAllTubes polls beanstalkd, running broker as new tubes are created.
 func (bd *BrokerDispatcher) RunAllTubes() (err error) {
 	conn, err := beanstalk.Dial("tcp", bd.address)
 	if err == nil {
