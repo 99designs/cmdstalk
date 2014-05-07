@@ -45,7 +45,11 @@ cmdstalk -help
 #   -cmd="": Command to run in worker.
 #   -tubes=[default]: Comma separated list of tubes.
 
-cmdstalk -cmd="/path/to/your/worker --your=flags --here" --tubes="your-tube"
+# Watch three specific tubes.
+cmdstalk -cmd="/path/to/your/worker --your=flags --here" -tubes="one,two,three"
+
+# Watch all current and future tubes.
+cmdstalk -all -cmd="cat"
 ```
 
 
@@ -79,7 +83,6 @@ TODO
 * Retry back-off delay.
 * Configurable concurrency per tube.
 * Ship linux binary; GitHub releases?
-* Poll for new tubes created after launch.
 
 
 [beanstalkd]: http://kr.github.io/beanstalkd/
