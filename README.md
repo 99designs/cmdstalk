@@ -74,6 +74,7 @@ file cmdstalk # cmdstalk: Mach-O 64-bit executable x86_64
 TODO
 ----
 
+* Graceful shutdown.
 * Retry limit for `exit(1)` releases.
 * Retry back-off delay.
 * Configurable concurrency per tube.

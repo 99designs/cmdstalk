@@ -30,11 +30,10 @@ func main() {
 		tubes = opts.Tubes
 	}
 
+	bd := broker.NewBrokerDispatcher(opts.Address, opts.Cmd)
+
 	for _, tube := range tubes {
-		go func(tube string) {
-			b := broker.New(opts.Address, tube, opts.Cmd, nil)
-			b.Run(nil)
-		}(tube)
+		bd.RunTube(tube)
 	}
 
 	// TODO: wire up to SIGTERM handler etc.
