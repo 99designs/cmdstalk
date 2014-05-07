@@ -51,12 +51,12 @@ func (j Job) Priority() (uint32, error) {
 }
 
 // Release the job, with its original priority and no delay.
-func (j Job) Release() error {
+func (j Job) Release(delay time.Duration) error {
 	pri, err := j.Priority()
 	if err != nil {
 		return err
 	}
-	return j.conn.Release(j.Id, pri, 0)
+	return j.conn.Release(j.Id, pri, delay)
 }
 
 // Releases counts how many times the job has been released back to the tube.

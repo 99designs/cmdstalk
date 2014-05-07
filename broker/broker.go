@@ -28,10 +28,6 @@ const (
 	// ReleaseTries is the number of releases a job must reach before it is
 	// buried. Zero means never execute.
 	ReleaseTries = 10
-
-	// ReleaseSleep is the time to sleep after releasing a job. This somewhat
-	// mitigates failure conditions where all jobs are failing.
-	ReleaseSleep = 1 * time.Second
 )
 
 type Broker struct {
@@ -226,9 +222,15 @@ func (b *Broker) handleResult(job bs.Job, result *JobResult) (err error) {
 		b.log.Printf("deleting job %d", job.Id)
 		err = job.Delete()
 	case 1:
-		b.log.Printf("releasing job %d and sleeping %v", job.Id, ReleaseSleep)
-		err = job.Release()
-		time.Sleep(ReleaseSleep)
+		r, err := job.Releases()
+		if err != nil {
+			r = ReleaseTries
+		}
+		// r*r*r*r means final of 10 tries has 1h49m21s delay, 4h15m33s total.
+		// See: http://play.golang.org/p/I15lUWoabI
+		delay := time.Duration(r*r*r*r) * time.Second
+		b.log.Printf("releasing job %d with %v delay (%d retries)", job.Id, delay, r)
+		err = job.Release(delay)
 	default:
 		err = fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
 	}
