@@ -22,7 +22,7 @@ import (
 func main() {
 	opts := cli.MustParseFlags()
 
-	bd := broker.NewBrokerDispatcher(opts.Address, opts.Cmd)
+	bd := broker.NewBrokerDispatcher(opts.Address, opts.Cmd, opts.PerTube)
 
 	if opts.All {
 		bd.RunAllTubes()

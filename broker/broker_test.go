@@ -23,7 +23,7 @@ func TestWorkerSuccess(t *testing.T) {
 
 	cmd := "tr [a-z] [A-Z]"
 	results := make(chan *JobResult)
-	b := New(address, tube, cmd, results)
+	b := New(address, tube, 0, cmd, results)
 
 	ticks := make(chan bool)
 	defer close(ticks)
@@ -51,7 +51,7 @@ func TestWorkerFailure(t *testing.T) {
 
 	cmd := "false"
 	results := make(chan *JobResult)
-	b := New(address, tube, cmd, results)
+	b := New(address, tube, 0, cmd, results)
 
 	ticks := make(chan bool)
 	defer close(ticks)
@@ -79,7 +79,7 @@ func TestWorkerTimeout(t *testing.T) {
 
 	cmd := "sleep 4"
 	results := make(chan *JobResult)
-	b := New(address, tube, cmd, results)
+	b := New(address, tube, 0, cmd, results)
 
 	ticks := make(chan bool)
 	defer close(ticks)

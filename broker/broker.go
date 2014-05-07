@@ -71,12 +71,12 @@ type JobResult struct {
 }
 
 // New broker instance.
-func New(address, tube string, cmd string, results chan<- *JobResult) (b Broker) {
+func New(address, tube string, slot uint64, cmd string, results chan<- *JobResult) (b Broker) {
 	b.Address = address
 	b.Tube = tube
 	b.Cmd = cmd
 
-	b.log = log.New(os.Stdout, fmt.Sprintf("[%s] ", tube), log.LstdFlags)
+	b.log = log.New(os.Stdout, fmt.Sprintf("[%s:%d] ", tube, slot), log.LstdFlags)
 	b.results = results
 	return
 }

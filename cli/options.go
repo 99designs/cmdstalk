@@ -24,6 +24,9 @@ type Options struct {
 	// The shell command to execute for each job.
 	Cmd string
 
+	// PerTube is the number of workers servicing each tube concurrently.
+	PerTube uint64
+
 	// The beanstalkd tubes to watch.
 	Tubes TubeList
 }
@@ -50,6 +53,7 @@ func ParseFlags() (o Options, err error) {
 	flag.StringVar(&o.Address, "address", "127.0.0.1:11300", "beanstalkd TCP address.")
 	flag.BoolVar(&o.All, "all", false, "Listen to all tubes, instead of -tubes=...")
 	flag.StringVar(&o.Cmd, "cmd", "", "Command to run in worker.")
+	flag.Uint64Var(&o.PerTube, "per-tube", 1, "Number of workers per tube.")
 	flag.Var(&o.Tubes, "tubes", "Comma separated list of tubes.")
 	flag.Parse()
 

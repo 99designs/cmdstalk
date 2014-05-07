@@ -16,24 +16,25 @@ type BrokerDispatcher struct {
 	address string
 	cmd     string
 	conn    *beanstalk.Conn
+	perTube uint64
 	tubeSet map[string]bool
 }
 
-func NewBrokerDispatcher(address, cmd string) *BrokerDispatcher {
+func NewBrokerDispatcher(address, cmd string, perTube uint64) *BrokerDispatcher {
 	return &BrokerDispatcher{
 		address: address,
 		cmd:     cmd,
+		perTube: perTube,
 		tubeSet: make(map[string]bool),
 	}
 }
 
-// RunTube runs a broker for the specified tube.
+// RunTube runs broker(s) for the specified tube.
 func (bd *BrokerDispatcher) RunTube(tube string) {
 	bd.tubeSet[tube] = true
-	go func() {
-		b := New(bd.address, tube, bd.cmd, nil)
-		b.Run(nil)
-	}()
+	for i := uint64(0); i < bd.perTube; i++ {
+		bd.runBroker(tube, i)
+	}
 }
 
 // RunTube runs a broker for the specified tubes.
@@ -62,6 +63,13 @@ func (bd *BrokerDispatcher) RunAllTubes() (err error) {
 	}()
 
 	return
+}
+
+func (bd *BrokerDispatcher) runBroker(tube string, slot uint64) {
+	go func() {
+		b := New(bd.address, tube, slot, bd.cmd, nil)
+		b.Run(nil)
+	}()
 }
 
 func (bd *BrokerDispatcher) watchNewTubes() (err error) {

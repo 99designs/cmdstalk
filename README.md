@@ -44,13 +44,14 @@ cmdstalk -help
 #   -address="127.0.0.1:11300": beanstalkd TCP address.
 #   -all=false: Listen to all tubes, instead of -tubes=...
 #   -cmd="": Command to run in worker.
+#   -per-tube=1: Number of workers per tube.
 #   -tubes=[default]: Comma separated list of tubes.
 
 # Watch three specific tubes.
 cmdstalk -cmd="/path/to/your/worker --your=flags --here" -tubes="one,two,three"
 
-# Watch all current and future tubes.
-cmdstalk -all -cmd="cat"
+# Watch all current and future tubes, four workers per tube.
+cmdstalk -all -cmd="cat" -per-tube=4
 ```
 
 
@@ -80,7 +81,8 @@ TODO
 ----
 
 * Graceful shutdown.
-* Configurable concurrency per tube.
+* SIGKILL recalcitrant worker processes.
+* Handle stdout.
 * Ship linux binary; GitHub releases?
 
 
