@@ -16,6 +16,19 @@ const (
 	DeadlineSoonDelay = 1 * time.Second
 )
 
+// Connect to beanstalkd and list tubes. Panic on error.
+func MustConnectAndListTubes(address string) []string {
+	conn, err := beanstalk.Dial("tcp", address)
+	if err != nil {
+		panic(err)
+	}
+	tubes, err := conn.ListTubes()
+	if err != nil {
+		panic(err)
+	}
+	return tubes
+}
+
 // reserve-with-timeout until there's a job or something panic-worthy.
 // Handles beanstalk.ErrTimeout by retrying immediately.
 // Handles beanstalk.ErrDeadline by sleeping DeadlineSoonDelay before retry.

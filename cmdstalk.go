@@ -16,13 +16,21 @@ package main
 
 import (
 	"github.com/99designs/cmdstalk/broker"
+	"github.com/99designs/cmdstalk/bs"
 	"github.com/99designs/cmdstalk/cli"
 )
 
 func main() {
 	opts := cli.MustParseFlags()
 
-	for _, tube := range opts.Tubes {
+	var tubes []string
+	if opts.All {
+		tubes = bs.MustConnectAndListTubes(opts.Address)
+	} else {
+		tubes = opts.Tubes
+	}
+
+	for _, tube := range tubes {
 		go func(tube string) {
 			b := broker.New(opts.Address, tube, opts.Cmd, nil)
 			b.Run(nil)

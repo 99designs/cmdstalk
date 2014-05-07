@@ -41,6 +41,7 @@ Usage
 cmdstalk -help
 # Usage of ./cmdstalk:
 #   -address="127.0.0.1:11300": beanstalkd TCP address.
+#   -all=false: Listen to all tubes, instead of -tubes=...
 #   -cmd="": Command to run in worker.
 #   -tubes=[default]: Comma separated list of tubes.
 
@@ -73,11 +74,11 @@ file cmdstalk # cmdstalk: Mach-O 64-bit executable x86_64
 TODO
 ----
 
-* Default to watching all tubes via `list-tubes`.
 * Retry limit for `exit(1)` releases.
 * Retry back-off delay.
 * Configurable concurrency per tube.
 * Ship linux binary; GitHub releases?
+* Poll for new tubes created after launch.
 
 
 [beanstalkd]: http://kr.github.io/beanstalkd/

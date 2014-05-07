@@ -18,6 +18,9 @@ type Options struct {
 	// The beanstalkd TCP address.
 	Address string
 
+	// All == true means all tubes will be watched.
+	All bool
+
 	// The shell command to execute for each job.
 	Cmd string
 
@@ -45,6 +48,7 @@ func ParseFlags() (o Options, err error) {
 	o.Tubes = TubeList{"default"}
 
 	flag.StringVar(&o.Address, "address", "127.0.0.1:11300", "beanstalkd TCP address.")
+	flag.BoolVar(&o.All, "all", false, "Listen to all tubes, instead of -tubes=...")
 	flag.StringVar(&o.Cmd, "cmd", "", "Command to run in worker.")
 	flag.Var(&o.Tubes, "tubes", "Comma separated list of tubes.")
 	flag.Parse()
