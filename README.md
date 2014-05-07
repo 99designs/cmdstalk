@@ -7,8 +7,8 @@ Written in [Go][golang], cmdstalk uses the [kr/beanstalk][beanstalk]
 library to interact with the [beanstalkd][beanstalkd] queue daemon.
 
 Each job is passed as stdin to a new instance of the configured worker command.
-On `exit(0)` the job is deleted. On `exit(1)` the job is released with an
-exponential-backoff delay (releases^4), up to 10 times.
+On `exit(0)` the job is deleted. On `exit(1)` (or any non-zero status) the job
+is released with an exponential-backoff delay (releases^4), up to 10 times.
 
 If the worker has not finished by the time the job TTR is reached, the worker
 is killed (SIGTERM, SIGKILL) and the job is allowed to time out. When the

@@ -221,7 +221,7 @@ func (b *Broker) handleResult(job bs.Job, result *JobResult) (err error) {
 	case 0:
 		b.log.Printf("deleting job %d", job.Id)
 		err = job.Delete()
-	case 1:
+	default:
 		r, err := job.Releases()
 		if err != nil {
 			r = ReleaseTries
@@ -231,8 +231,6 @@ func (b *Broker) handleResult(job bs.Job, result *JobResult) (err error) {
 		delay := time.Duration(r*r*r*r) * time.Second
 		b.log.Printf("releasing job %d with %v delay (%d retries)", job.Id, delay, r)
 		err = job.Release(delay)
-	default:
-		err = fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
 	}
 	return
 }
