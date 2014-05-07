@@ -19,3 +19,10 @@ func (bd *BrokerDispatcher) RunTube(tube string) {
 		b.Run(nil)
 	}()
 }
+
+// RunTube runs a broker for the specified tubes.
+func (bd *BrokerDispatcher) RunTubes(tubes []string) {
+	for _, tube := range tubes {
+		bd.RunTube(tube)
+	}
+}
