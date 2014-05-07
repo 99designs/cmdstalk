@@ -16,22 +16,19 @@ package main
 
 import (
 	"github.com/99designs/cmdstalk/broker"
-	"github.com/99designs/cmdstalk/bs"
 	"github.com/99designs/cmdstalk/cli"
 )
 
 func main() {
 	opts := cli.MustParseFlags()
 
-	var tubes []string
-	if opts.All {
-		tubes = bs.MustConnectAndListTubes(opts.Address)
-	} else {
-		tubes = opts.Tubes
-	}
-
 	bd := broker.NewBrokerDispatcher(opts.Address, opts.Cmd)
-	bd.RunTubes(tubes)
+
+	if opts.All {
+		bd.RunAllTubes()
+	} else {
+		bd.RunTubes(opts.Tubes)
+	}
 
 	// TODO: wire up to SIGTERM handler etc.
 	exitChan := make(chan bool)

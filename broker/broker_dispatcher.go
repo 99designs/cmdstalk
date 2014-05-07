@@ -1,5 +1,9 @@
 package broker
 
+import (
+	"github.com/99designs/cmdstalk/bs"
+)
+
 type BrokerDispatcher struct {
 	address string
 	cmd     string
@@ -25,4 +29,9 @@ func (bd *BrokerDispatcher) RunTubes(tubes []string) {
 	for _, tube := range tubes {
 		bd.RunTube(tube)
 	}
+}
+
+// RunAllTubes polls beanstalkd, running a broker as new tubes are created.
+func (bd *BrokerDispatcher) RunAllTubes() {
+	bd.RunTubes(bs.MustConnectAndListTubes(bd.address))
 }
