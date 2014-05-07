@@ -20,6 +20,18 @@ const (
 	// e.g. reserving a TTR=1 job will show time-left=0.
 	// We need to set our SIGTERM timer to time-left + ttrMargin.
 	ttrMargin = 1 * time.Second
+
+	// TimeoutTries is the number of timeouts a job must reach before it is
+	// buried. Zero means never execute.
+	TimeoutTries = 1
+
+	// ReleaseTries is the number of releases a job must reach before it is
+	// buried. Zero means never execute.
+	ReleaseTries = 10
+
+	// ReleaseSleep is the time to sleep after releasing a job. This somewhat
+	// mitigates failure conditions where all jobs are failing.
+	ReleaseSleep = 1 * time.Second
 )
 
 type Broker struct {
@@ -99,10 +111,23 @@ func (b *Broker) Run(ticks chan bool) {
 
 		t, err := job.Timeouts()
 		if err != nil {
-			log.Panic(err)
+			b.log.Panic(err)
 		}
-		if t > 0 {
+		if t >= TimeoutTries {
 			b.log.Printf("job %d has %d timeouts, burying", job.Id, t)
+			job.Bury()
+			if b.results != nil {
+				b.results <- &JobResult{JobId: job.Id, Buried: true}
+			}
+			continue
+		}
+
+		releases, err := job.Releases()
+		if err != nil {
+			b.log.Panic(err)
+		}
+		if releases >= ReleaseTries {
+			b.log.Printf("job %d has %d releases, burying", job.Id, releases)
 			job.Bury()
 			if b.results != nil {
 				b.results <- &JobResult{JobId: job.Id, Buried: true}
@@ -201,8 +226,9 @@ func (b *Broker) handleResult(job bs.Job, result *JobResult) (err error) {
 		b.log.Printf("deleting job %d", job.Id)
 		err = job.Delete()
 	case 1:
-		b.log.Printf("releasing job %d", job.Id)
+		b.log.Printf("releasing job %d and sleeping %v", job.Id, ReleaseSleep)
 		err = job.Release()
+		time.Sleep(ReleaseSleep)
 	default:
 		err = fmt.Errorf("Unhandled exit status %d", result.ExitStatus)
 	}

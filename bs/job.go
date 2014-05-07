@@ -59,6 +59,11 @@ func (j Job) Release() error {
 	return j.conn.Release(j.Id, pri, 0)
 }
 
+// Releases counts how many times the job has been released back to the tube.
+func (j Job) Releases() (uint64, error) {
+	return j.uint64Stat("releases")
+}
+
 func (j Job) String() string {
 	stats, err := j.conn.StatsJob(j.Id)
 	if err == nil {
