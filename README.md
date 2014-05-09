@@ -30,9 +30,7 @@ go get github.com/99designs/cmdstalk
 
 From binary:
 
-```sh
-# TODO
-```
+https://github.com/99designs/cmdstalk/releases
 
 
 Usage
@@ -74,6 +72,23 @@ go run cmdstalk.go -cmd='hexdump -C' -tubes="default,another"
 # Build and run a binary.
 go build
 file cmdstalk # cmdstalk: Mach-O 64-bit executable x86_64
+```
+
+
+Release
+-------
+
+```sh
+# Set up cross-compiling tool.
+go get github.com/mitchellh/gox
+gox -build-toolchain -os="darwin linux" -arch="amd64"
+
+# Compile for various systems.
+gox -os="darwin linux" -arch="amd64"
+gzip cmdstalk_*_*
+
+# Create a release.
+open https://github.com/99designs/cmdstalk/releases/new
 ```
 
 
