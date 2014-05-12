@@ -1,17 +1,22 @@
-// cmdstalk is a beanstalkd queue broker. It connects to beanstalkd, watches
-// tubes, reserves jobs, and spawns subcommands to process the work.
-//
-// cmdstalk monitors the exit status of the worker process, and manages the
-// beanstalkd job accordingly.
-//
-// If a job TTR is reached, cmdstalk will send SIGTERM then SIGKILL to the
-// worker, and allow the job to time out.
-//
-// Worker exit(0) tells cmdstalk to delete the job.
-// Worker exit(1) tells cmdstalk to release the job for reprocessing.
-// Worker exit(2) tells cmdstalk to bury the job.
-//
-// Stderr from the workers is sent to cmdstalk stderr.
+/*
+	Cmdstalk is a unix-process-based [beanstalkd][beanstalkd] queue broker.
+
+	Written in [Go][golang], cmdstalk uses the [kr/beanstalk][beanstalk]
+	library to interact with the [beanstalkd][beanstalkd] queue daemon.
+
+	Each job is passed as stdin to a new instance of the configured worker
+	command.  On `exit(0)` the job is deleted. On `exit(1)` (or any non-zero
+	status) the job is released with an exponential-backoff delay (releases^4),
+	up to 10 times.
+
+	If the worker has not finished by the time the job TTR is reached, the
+	worker is killed (SIGTERM, SIGKILL) and the job is allowed to time out.
+	When the job is subsequently reserved, the `timeouts: 1` will cause it to
+	be buried.
+
+	In this way, job workers can be arbitrary commands, and queue semantics are
+	reduced down to basic unix concepts of exit status and signals.
+*/
 package main
 
 import (

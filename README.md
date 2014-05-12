@@ -97,8 +97,8 @@ TODO
 
 * Graceful shutdown.
 * SIGKILL recalcitrant worker processes.
-* Handle stdout.
-* Ship linux binary; GitHub releases?
+* Logging improvements; stdout/stderr, concurrency-safety.
+* Interactive mode; single-concurrency, prompt for action for each job.
 
 
 [beanstalkd]: http://kr.github.io/beanstalkd/
