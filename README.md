@@ -101,6 +101,14 @@ TODO
 * Interactive mode; single-concurrency, prompt for action for each job.
 
 
+---
+
+Created by [Paul Annesley][pda] and [Lachlan Donald][lox].
+
+© Copyright 2014 99designs Inc.
+
 [beanstalkd]: http://kr.github.io/beanstalkd/
 [beanstalk]: http://godoc.org/github.com/kr/beanstalk
 [golang]: http://golang.org/
+[pda]: https://twitter.com/pda
+[lox]: https://twitter.com/lox
