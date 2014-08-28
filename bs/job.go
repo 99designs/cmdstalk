@@ -44,6 +44,11 @@ func (j Job) Delete() error {
 	return j.conn.Delete(j.Id)
 }
 
+// Kicks counts how many times the job has been kicked from a buried state.
+func (j Job) Kicks() (uint64, error) {
+	return j.uint64Stat("kicks")
+}
+
 // Priority of the job, zero is most urgent, 4,294,967,295 is least.
 func (j Job) Priority() (uint32, error) {
 	pri64, err := j.uint64Stat("pri")

@@ -105,12 +105,17 @@ func (b *Broker) Run(ticks chan bool) {
 		id, body := bs.MustReserveWithoutTimeout(ts)
 		job := bs.NewJob(id, body, conn)
 
+		kicks, err := job.Kicks()
+		if err != nil {
+			b.log.Panic(err)
+		}
+
 		t, err := job.Timeouts()
 		if err != nil {
 			b.log.Panic(err)
 		}
-		if t >= TimeoutTries {
-			b.log.Printf("job %d has %d timeouts, burying", job.Id, t)
+		if (t - kicks) >= TimeoutTries {
+			b.log.Printf("job %d has %d timeouts and %d kicks, burying", job.Id, t, kicks)
 			job.Bury()
 			if b.results != nil {
 				b.results <- &JobResult{JobId: job.Id, Buried: true}
@@ -122,8 +127,8 @@ func (b *Broker) Run(ticks chan bool) {
 		if err != nil {
 			b.log.Panic(err)
 		}
-		if releases >= ReleaseTries {
-			b.log.Printf("job %d has %d releases, burying", job.Id, releases)
+		if (releases - kicks) >= ReleaseTries {
+			b.log.Printf("job %d has %d releases and %d kicks, burying", job.Id, releases, kicks)
 			job.Bury()
 			if b.results != nil {
 				b.results <- &JobResult{JobId: job.Id, Buried: true}
