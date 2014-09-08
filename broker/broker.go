@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"time"
+	"math"
 
 	"github.com/99designs/cmdstalk/bs"
 	"github.com/99designs/cmdstalk/cmd"
@@ -23,7 +24,7 @@ const (
 
 	// TimeoutTries is the number of timeouts a job must reach before it is
 	// buried. Zero means never execute.
-	TimeoutTries = 1
+	TimeoutTries = 3
 
 	// ReleaseTries is the number of releases a job must reach before it is
 	// buried. Zero means never execute.
@@ -213,7 +214,17 @@ waitLoop:
 
 func (b *Broker) handleResult(job bs.Job, result *JobResult) (err error) {
 	if result.TimedOut {
-		b.log.Printf("job %d timed out", job.Id)
+		t, err := job.Timeouts()
+		if err != nil {
+			t = TimeoutTries
+		}
+		if t < TimeoutTries {
+			delay := time.Duration(math.pow(2, float64(t))) * time.Hour
+			b.log.Printf("releasing job %d with %v delay (%d timeouts)", job.Id, delay, t)
+			err = job.Release(delay)
+		} else {
+			b.log.Printf("job %d timed out", job.Id)
+		}
 		return
 	}
 	b.log.Printf("job %d finished with exit(%d)", job.Id, result.ExitStatus)
