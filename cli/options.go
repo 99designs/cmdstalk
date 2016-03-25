@@ -27,6 +27,9 @@ type Options struct {
 	// PerTube is the number of workers servicing each tube concurrently.
 	PerTube uint64
 
+	// Tries is the number of times that a job should be attempted before being burried
+	Tries uint64
+
 	// The beanstalkd tubes to watch.
 	Tubes TubeList
 }
@@ -54,6 +57,7 @@ func ParseFlags() (o Options, err error) {
 	flag.BoolVar(&o.All, "all", false, "Listen to all tubes, instead of -tubes=...")
 	flag.StringVar(&o.Cmd, "cmd", "", "Command to run in worker.")
 	flag.Uint64Var(&o.PerTube, "per-tube", 1, "Number of workers per tube.")
+	flag.Uint64Var(&o.Tries, "tries", 10, "Number of times to attempt to execute a job.")
 	flag.Var(&o.Tubes, "tubes", "Comma separated list of tubes.")
 	flag.Parse()
 
@@ -71,6 +75,10 @@ func validateOptions(o Options) error {
 
 	if o.Address == "" {
 		msgs = append(msgs, "Address must not be empty.")
+	}
+
+	if o.Tries < 1 {
+		msgs = append(msgs, "Tries must be 1 or more.")
 	}
 
 	if len(msgs) == 0 {
