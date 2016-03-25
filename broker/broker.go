@@ -24,10 +24,12 @@ const (
 	// TimeoutTries is the number of timeouts a job must reach before it is
 	// buried. Zero means never execute.
 	TimeoutTries = 1
+)
 
+var (
 	// ReleaseTries is the number of releases a job must reach before it is
 	// buried. Zero means never execute.
-	ReleaseTries = 10
+	ReleaseTries uint64 = 10
 )
 
 type Broker struct {

@@ -27,6 +27,8 @@ import (
 func main() {
 	opts := cli.MustParseFlags()
 
+	broker.ReleaseTries = opts.Tries
+
 	bd := broker.NewBrokerDispatcher(opts.Address, opts.Cmd, opts.PerTube)
 
 	if opts.All {
