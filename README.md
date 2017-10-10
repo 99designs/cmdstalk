@@ -56,9 +56,6 @@ cmdstalk -all -cmd="cat" -per-tube=4
 Dev
 ---
 
-[gpm](https://github.com/pote/gpm) is used to track dependencies. Make sure
-you have a sane `$GOPATH` etc, then `brew install gpm` and `gpm install`.
-
 ```sh
 # Run all tests, with minimal/buffered output.
 go test ./...
