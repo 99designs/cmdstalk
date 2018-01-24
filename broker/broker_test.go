@@ -103,11 +103,11 @@ func TestWorkerTimeout(t *testing.T) {
 
 	ticks <- true // handle another job
 	result = <-results
-	if !result.Buried {
-		t.Fatalf("Expected job %d JobResult.Buried", id)
+	if result.Buried {
+		t.Fatalf("Expected job %d not to be buried", id)
 	}
-	assertJobStat(t, id, "state", "buried")
-	assertJobStat(t, id, "timeouts", "1")
+	assertJobStat(t, id, "state", "ready")
+	assertJobStat(t, id, "timeouts", "2")
 }
 
 func queueJob(body string, priority uint32, ttr time.Duration) (string, uint64) {
