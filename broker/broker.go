@@ -21,10 +21,6 @@ const (
 	// We need to set our SIGTERM timer to time-left + ttrMargin.
 	ttrMargin = 1 * time.Second
 
-	// TimeoutTries is the number of timeouts a job must reach before it is
-	// buried. Zero means never execute.
-	TimeoutTries = 1
-
 	// ReleaseTries is the number of releases a job must reach before it is
 	// buried. Zero means never execute.
 	ReleaseTries = 10
@@ -104,19 +100,6 @@ func (b *Broker) Run(ticks chan bool) {
 		b.log.Println("reserve (waiting for job)")
 		id, body := bs.MustReserveWithoutTimeout(ts)
 		job := bs.NewJob(id, body, conn)
-
-		t, err := job.Timeouts()
-		if err != nil {
-			b.log.Panic(err)
-		}
-		if t >= TimeoutTries {
-			b.log.Printf("job %d has %d timeouts, burying", job.Id, t)
-			job.Bury()
-			if b.results != nil {
-				b.results <- &JobResult{JobId: job.Id, Buried: true}
-			}
-			continue
-		}
 
 		releases, err := job.Releases()
 		if err != nil {
