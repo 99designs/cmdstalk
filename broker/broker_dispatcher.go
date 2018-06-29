@@ -20,22 +20,27 @@ const (
 // created. The `perTube` option determines how many brokers are started for
 // each tube.
 type BrokerDispatcher struct {
-	address string
-	cmd     string
-	conn    *beanstalk.Conn
-	perTube uint64
-	tubeSet map[string]bool
-	ctx     context.Context
-	wg      sync.WaitGroup
+	address     string
+	cmd         string
+	conn        *beanstalk.Conn
+	perTube     uint64
+	tubeSet     map[string]bool
+	jobReceived chan<- struct{}
+	ctx         context.Context
+	wg          sync.WaitGroup
 }
 
-func NewBrokerDispatcher(ctx context.Context, address, cmd string, perTube uint64) *BrokerDispatcher {
+func NewBrokerDispatcher(parentCtx context.Context, address, cmd string, perTube, maxJobs uint64) *BrokerDispatcher {
+	ctx, cancel := context.WithCancel(parentCtx)
+	jobReceived := make(chan struct{})
+	go limittedCountGenerator(maxJobs, cancel, jobReceived)
 	return &BrokerDispatcher{
-		address: address,
-		cmd:     cmd,
-		perTube: perTube,
-		tubeSet: make(map[string]bool),
-		ctx:     ctx,
+		address:     address,
+		cmd:         cmd,
+		perTube:     perTube,
+		tubeSet:     make(map[string]bool),
+		jobReceived: jobReceived,
+		ctx:         ctx,
 	}
 }
 
@@ -77,11 +82,25 @@ func (bd *BrokerDispatcher) RunAllTubes() (err error) {
 	return
 }
 
+// limittedCountGenerator creates a channel that returns a boolean channel with
+// nlimit true's and false otherwise. If nlimit is 0 it the channel will always
+// be containing true.
+func limittedCountGenerator(nlimit uint64, cancel context.CancelFunc, eventHappened <-chan struct{}) {
+	ngenerated := uint64(1)
+	for range eventHappened {
+		if nlimit != 0 && ngenerated == nlimit {
+			log.Println("reached job limit. quitting.")
+			cancel()
+		}
+		ngenerated++
+	}
+}
+
 func (bd *BrokerDispatcher) runBroker(tube string, slot uint64) {
 	bd.wg.Add(1)
 	go func() {
 		defer bd.wg.Done()
-		b := New(bd.ctx, bd.address, tube, slot, bd.cmd, nil)
+		b := New(bd.ctx, bd.address, tube, slot, bd.cmd, nil, bd.jobReceived)
 		b.Run(nil)
 	}()
 }

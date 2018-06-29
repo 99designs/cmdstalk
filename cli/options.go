@@ -29,6 +29,9 @@ type Options struct {
 
 	// The beanstalkd tubes to watch.
 	Tubes TubeList
+
+	// Maximum number of jobs to process before exitting.
+	MaxJobs uint64
 }
 
 // TubeList is a list of beanstalkd tube names.
@@ -54,6 +57,7 @@ func ParseFlags() (o Options, err error) {
 	flag.BoolVar(&o.All, "all", false, "Listen to all tubes, instead of -tubes=...")
 	flag.StringVar(&o.Cmd, "cmd", "", "Command to run in worker.")
 	flag.Uint64Var(&o.PerTube, "per-tube", 1, "Number of workers per tube.")
+	flag.Uint64Var(&o.MaxJobs, "max-jobs", 0, "Maximum number of items to process before exitting. Zero for no limit.")
 	flag.Var(&o.Tubes, "tubes", "Comma separated list of tubes.")
 	flag.Parse()
 

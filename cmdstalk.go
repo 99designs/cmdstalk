@@ -41,7 +41,7 @@ func main() {
 		cancel()
 	}()
 
-	bd := broker.NewBrokerDispatcher(ctx, opts.Address, opts.Cmd, opts.PerTube)
+	bd := broker.NewBrokerDispatcher(ctx, opts.Address, opts.Cmd, opts.PerTube, opts.MaxJobs)
 
 	if opts.All {
 		bd.RunAllTubes()

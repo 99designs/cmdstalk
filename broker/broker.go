@@ -42,9 +42,10 @@ type Broker struct {
 	// Tube name this broker will service.
 	Tube string
 
-	log     *log.Logger
-	results chan<- *JobResult
-	ctx     context.Context
+	log         *log.Logger
+	results     chan<- *JobResult
+	jobReceived chan<- struct{}
+	ctx         context.Context
 }
 
 type JobResult struct {
@@ -73,13 +74,14 @@ type JobResult struct {
 }
 
 // New broker instance.
-func New(ctx context.Context, address, tube string, slot uint64, cmd string, results chan<- *JobResult) (b Broker) {
+func New(ctx context.Context, address, tube string, slot uint64, cmd string, results chan<- *JobResult, jobReceived chan<- struct{}) (b Broker) {
 	b.Address = address
 	b.Tube = tube
 	b.Cmd = cmd
 
 	b.log = log.New(os.Stdout, fmt.Sprintf("[%s:%d] ", tube, slot), log.LstdFlags)
 	b.results = results
+	b.jobReceived = jobReceived
 	b.ctx = ctx
 	return
 }
@@ -116,6 +118,8 @@ func (b *Broker) Run(ticks chan bool) {
 		}
 
 		job := bs.NewJob(id, body, conn)
+
+		b.jobReceived <- struct{}{}
 
 		t, err := job.Timeouts()
 		if err != nil {
