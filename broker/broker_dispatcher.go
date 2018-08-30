@@ -1,7 +1,9 @@
 package broker
 
 import (
+	"context"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/kr/beanstalk"
@@ -23,14 +25,17 @@ type BrokerDispatcher struct {
 	conn    *beanstalk.Conn
 	perTube uint64
 	tubeSet map[string]bool
+	ctx     context.Context
+	wg      sync.WaitGroup
 }
 
-func NewBrokerDispatcher(address, cmd string, perTube uint64) *BrokerDispatcher {
+func NewBrokerDispatcher(ctx context.Context, address, cmd string, perTube uint64) *BrokerDispatcher {
 	return &BrokerDispatcher{
 		address: address,
 		cmd:     cmd,
 		perTube: perTube,
 		tubeSet: make(map[string]bool),
+		ctx:     ctx,
 	}
 }
 
@@ -73,10 +78,16 @@ func (bd *BrokerDispatcher) RunAllTubes() (err error) {
 }
 
 func (bd *BrokerDispatcher) runBroker(tube string, slot uint64) {
+	bd.wg.Add(1)
 	go func() {
-		b := New(bd.address, tube, slot, bd.cmd, nil)
+		defer bd.wg.Done()
+		b := New(bd.ctx, bd.address, tube, slot, bd.cmd, nil)
 		b.Run(nil)
 	}()
+}
+
+func (bd *BrokerDispatcher) Wait() {
+	bd.wg.Wait()
 }
 
 func (bd *BrokerDispatcher) watchNewTubes() (err error) {
