@@ -5,6 +5,7 @@
 package broker
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -41,8 +42,10 @@ type Broker struct {
 	// Tube name this broker will service.
 	Tube string
 
-	log     *log.Logger
-	results chan<- *JobResult
+	log         *log.Logger
+	results     chan<- *JobResult
+	jobReceived chan<- struct{}
+	ctx         context.Context
 }
 
 type JobResult struct {
@@ -71,13 +74,15 @@ type JobResult struct {
 }
 
 // New broker instance.
-func New(address, tube string, slot uint64, cmd string, results chan<- *JobResult) (b Broker) {
+func New(ctx context.Context, address, tube string, slot uint64, cmd string, results chan<- *JobResult, jobReceived chan<- struct{}) (b Broker) {
 	b.Address = address
 	b.Tube = tube
 	b.Cmd = cmd
 
 	b.log = log.New(os.Stdout, fmt.Sprintf("[%s:%d] ", tube, slot), log.LstdFlags)
 	b.results = results
+	b.jobReceived = jobReceived
+	b.ctx = ctx
 	return
 }
 
@@ -94,6 +99,7 @@ func (b *Broker) Run(ticks chan bool) {
 	b.log.Println("watching", b.Tube)
 	ts := beanstalk.NewTubeSet(conn, b.Tube)
 
+	b.log.Println("starting reserve loop (waiting for job)")
 	for {
 		if ticks != nil {
 			if _, ok := <-ticks; !ok {
@@ -101,9 +107,19 @@ func (b *Broker) Run(ticks chan bool) {
 			}
 		}
 
-		b.log.Println("reserve (waiting for job)")
-		id, body := bs.MustReserveWithoutTimeout(ts)
+		if isCancelled(b.ctx) {
+			break
+		}
+
+		id, body, err := bs.MustReserveWithTimeout(ts, 1*time.Second)
+		if err == bs.ErrTimeout {
+			// Doing this to be able to gracefully handle cancelled context.
+			continue
+		}
+
 		job := bs.NewJob(id, body, conn)
+
+		b.jobReceived <- struct{}{}
 
 		t, err := job.Timeouts()
 		if err != nil {
@@ -152,6 +168,15 @@ func (b *Broker) Run(ticks chan bool) {
 	}
 
 	b.log.Println("broker finished")
+}
+
+func isCancelled(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
 }
 
 func (b *Broker) executeJob(job bs.Job, shellCmd string) (result *JobResult, err error) {

@@ -44,6 +44,7 @@ cmdstalk -help
 #   -cmd="": Command to run in worker.
 #   -per-tube=1: Number of workers per tube.
 #   -tubes=[default]: Comma separated list of tubes.
+#   -max-jobs=0: Maximum number of items to process before exitting. Zero for no limit.
 
 # Watch three specific tubes.
 cmdstalk -cmd="/path/to/your/worker --your=flags --here" -tubes="one,two,three"
