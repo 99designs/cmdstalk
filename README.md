@@ -25,7 +25,7 @@ From source:
 
 ```sh
 # Make sure you have a sane $GOPATH
-go get github.com/99designs/cmdstalk
+go install github.com/99designs/cmdstalk@latest
 ```
 
 From binary:
@@ -56,9 +56,6 @@ cmdstalk -all -cmd="cat" -per-tube=4
 Dev
 ---
 
-[gpm](https://github.com/pote/gpm) is used to track dependencies. Make sure
-you have a sane `$GOPATH` etc, then `brew install gpm` and `gpm install`.
-
 ```sh
 # Run all tests, with minimal/buffered output.
 go test ./...
@@ -80,7 +77,7 @@ Release
 
 ```sh
 # Set up cross-compiling tool.
-go get github.com/mitchellh/gox
+go install github.com/mitchellh/gox@latest
 gox -build-toolchain -os="darwin linux" -arch="amd64"
 
 # Compile for various systems.
