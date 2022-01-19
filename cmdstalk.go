@@ -20,6 +20,11 @@
 package main
 
 import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+
 	"github.com/99designs/cmdstalk/broker"
 	"github.com/99designs/cmdstalk/cli"
 )
@@ -27,7 +32,16 @@ import (
 func main() {
 	opts := cli.MustParseFlags()
 
-	bd := broker.NewBrokerDispatcher(opts.Address, opts.Cmd, opts.PerTube)
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-c
+		log.Println("received interrupt. quitting.")
+		cancel()
+	}()
+
+	bd := broker.NewBrokerDispatcher(ctx, opts.Address, opts.Cmd, opts.PerTube, opts.MaxJobs)
 
 	if opts.All {
 		bd.RunAllTubes()
@@ -35,7 +49,5 @@ func main() {
 		bd.RunTubes(opts.Tubes)
 	}
 
-	// TODO: wire up to SIGTERM handler etc.
-	exitChan := make(chan bool)
-	<-exitChan
+	bd.Wait()
 }
